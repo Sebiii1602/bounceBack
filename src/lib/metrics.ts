@@ -1,0 +1,137 @@
+import { MOMENTUM } from './config'
+import { parseKey, shiftKey, todayKey } from './dates'
+import type { LogEntry } from './types'
+
+export interface TrendPoint {
+  date: string
+  /** Prozent 0–100 oder null, wenn im Fenster nichts geloggt wurde. */
+  pct: number | null
+}
+
+export interface MomentumPoint {
+  date: string
+  value: number
+}
+
+export interface TagStat {
+  label: string
+  count: number
+  /** Anteil an allen „Heute nicht“-Tagen (0–1). */
+  share: number
+}
+
+export interface WeekdayStat {
+  /** 0 = Montag … 6 = Sonntag */
+  weekday: number
+  label: string
+  count: number
+}
+
+export const WEEKDAYS_DE = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'] as const
+
+const clamp = (v: number, min: number, max: number): number => Math.min(max, Math.max(min, v))
+
+function logMap(logs: LogEntry[]): Map<string, boolean> {
+  const m = new Map<string, boolean>()
+  for (const l of logs) m.set(l.date, l.on_track)
+  return m
+}
+
+/**
+ * Rollierender Anteil „on track“ pro Tag über `spanDays`, Fenster `windowDays`.
+ * Nicht geloggte Tage zählen nicht in den Nenner — Vergessen wird nicht bestraft.
+ */
+export function rollingSeries(
+  logs: LogEntry[],
+  spanDays: number,
+  windowDays = 30,
+  today = todayKey(),
+): TrendPoint[] {
+  const map = logMap(logs)
+  const total = spanDays + windowDays - 1
+  const keys: string[] = new Array(total)
+  keys[total - 1] = today
+  for (let i = total - 2; i >= 0; i--) keys[i] = shiftKey(keys[i + 1], -1)
+
+  const out: TrendPoint[] = []
+  let logged = 0
+  let onTrack = 0
+  for (let i = 0; i < total; i++) {
+    const v = map.get(keys[i])
+    if (v !== undefined) {
+      logged++
+      if (v) onTrack++
+    }
+    const leaving = i - windowDays
+    if (leaving >= 0) {
+      const w = map.get(keys[leaving])
+      if (w !== undefined) {
+        logged--
+        if (w) onTrack--
+      }
+    }
+    if (i >= total - spanDays) {
+      out.push({ date: keys[i], pct: logged === 0 ? null : Math.round((onTrack / logged) * 100) })
+    }
+  }
+  return out
+}
+
+export function currentRollingPct(logs: LogEntry[], windowDays = 30, today = todayKey()): number | null {
+  return rollingSeries(logs, 1, windowDays, today)[0]!.pct
+}
+
+/**
+ * Momentum als Ausdauerbalken: Start bei 50, geloggte Tage verschieben ihn
+ * asymmetrisch (+2 / −8), begrenzt auf 0–100. Nicht geloggte Tage frieren ein.
+ */
+export function momentumSeries(logs: LogEntry[], today = todayKey()): MomentumPoint[] {
+  if (logs.length === 0) return []
+  const map = logMap(logs)
+  let first = logs[0]!.date
+  for (const l of logs) if (l.date < first) first = l.date
+
+  const out: MomentumPoint[] = []
+  let value: number = MOMENTUM.start
+  for (let d = first; d <= today; d = shiftKey(d, 1)) {
+    const v = map.get(d)
+    if (v !== undefined) {
+      value = clamp(value + (v ? MOMENTUM.up : MOMENTUM.down), MOMENTUM.min, MOMENTUM.max)
+    }
+    out.push({ date: d, value })
+  }
+  return out
+}
+
+export function currentMomentum(logs: LogEntry[], today = todayKey()): number {
+  const series = momentumSeries(logs, today)
+  return series.length > 0 ? series[series.length - 1]!.value : MOMENTUM.start
+}
+
+export function relapseLogs(logs: LogEntry[]): LogEntry[] {
+  return logs.filter((l) => !l.on_track)
+}
+
+/** Trigger-Häufigkeit über alle „Heute nicht“-Tage, absteigend sortiert. */
+export function tagStats(logs: LogEntry[]): TagStat[] {
+  const relapses = relapseLogs(logs)
+  if (relapses.length === 0) return []
+  const counts = new Map<string, number>()
+  for (const l of relapses) {
+    for (const tag of l.trigger_tags) counts.set(tag, (counts.get(tag) ?? 0) + 1)
+  }
+  return [...counts.entries()]
+    .map(([label, count]) => ({ label, count, share: count / relapses.length }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
+}
+
+/** Wochentagsverteilung der „Heute nicht“-Tage (Mo–So). */
+export function weekdayStats(logs: LogEntry[]): WeekdayStat[] {
+  const counts = new Array<number>(7).fill(0)
+  for (const l of relapseLogs(logs)) {
+    const jsDay = parseKey(l.date).getDay() // 0 = Sonntag
+    const idx = (jsDay + 6) % 7 // 0 = Montag
+    counts[idx] = (counts[idx] ?? 0) + 1
+  }
+  return counts.map((count, weekday) => ({ weekday, label: WEEKDAYS_DE[weekday]!, count }))
+}

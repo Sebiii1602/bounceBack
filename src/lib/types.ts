@@ -1,0 +1,39 @@
+export interface Habit {
+  id: string
+  name: string
+  created_at: string
+  updated_at: string
+}
+
+export interface LogEntry {
+  id: string
+  habit_id: string
+  /** Lokales Kalenderdatum als 'yyyy-MM-dd' */
+  date: string
+  on_track: boolean
+  trigger_tags: string[]
+  note: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface Tag {
+  id: string
+  label: string
+  created_at: string
+  updated_at: string
+}
+
+export type SyncTable = 'habits' | 'tags' | 'logs'
+
+export interface OutboxRow {
+  seq: number
+  table: SyncTable
+  op: 'upsert' | 'delete'
+  row_id: string
+}
+
+export interface MetaRow {
+  key: string
+  value: string
+}

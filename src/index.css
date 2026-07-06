@@ -1,0 +1,35 @@
+@import "tailwindcss";
+
+@theme {
+  --color-paper: #fafaf9;
+  --color-card: #ffffff;
+  --color-line: #e7e5e4;
+  --color-ink: #1c1917;
+  --color-soft: #78716c;
+  --color-faint: #a8a29e;
+
+  /* on track — gedecktes Salbei/Teal */
+  --color-track: #4f9682;
+  --color-track-deep: #38705f;
+  --color-track-soft: #e6f1ed;
+
+  /* nicht on track — warmer Sand, bewusst kein Rot */
+  --color-slip: #b98a5e;
+  --color-slip-deep: #8a6844;
+  --color-slip-soft: #f6ecdf;
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+html {
+  background: var(--color-paper);
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+  background: var(--color-paper);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
