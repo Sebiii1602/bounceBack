@@ -11,6 +11,9 @@ import { fmtDayShort, fmtTick } from '../lib/dates'
 import type { TrendPoint } from '../lib/metrics'
 
 export function TrendChart({ data }: { data: TrendPoint[] }) {
+  // In den ersten Tagen ist die Linie kaum sichtbar — Punkte helfen, bis genug Daten da sind
+  const loggedPoints = data.filter((p) => p.pct !== null).length
+  const dot = loggedPoints <= 10 ? { r: 3, strokeWidth: 0, fill: 'var(--color-track)' } : false
   return (
     <ResponsiveContainer width="100%" height={210}>
       <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
@@ -47,7 +50,7 @@ export function TrendChart({ data }: { data: TrendPoint[] }) {
           dataKey="pct"
           stroke="var(--color-track)"
           strokeWidth={2}
-          dot={false}
+          dot={dot}
           connectNulls
         />
       </LineChart>
