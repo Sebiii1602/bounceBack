@@ -32,20 +32,21 @@ export function CalendarGrid({
         const key = dateKey(day)
         if (!isSameMonth(day, month)) return <div key={key} />
         const state = logsByDate.get(key)
-        const future = key > today
+        // Heute ist noch nicht bewertbar — nur abgeschlossene Tage sind antippbar
+        const locked = key >= today
         const isToday = key === today
 
         let cls: string
         if (state === true) cls = 'bg-track-soft font-medium text-track-deep'
         else if (state === false) cls = 'bg-slip-soft font-medium text-slip-deep'
-        else if (future) cls = 'text-faint/50'
+        else if (locked) cls = 'text-faint/50'
         else cls = 'border border-line/70 text-soft'
 
         return (
           <button
             key={key}
             type="button"
-            disabled={future}
+            disabled={locked}
             onClick={() => onPick(key)}
             className={`flex aspect-square items-center justify-center rounded-lg text-sm transition active:scale-95 ${cls} ${
               isToday ? 'ring-1 ring-track' : ''

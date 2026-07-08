@@ -10,6 +10,12 @@ export const parseKey = (key: string): Date => parse(key, 'yyyy-MM-dd', new Date
 
 export const shiftKey = (key: string, days: number): string => dateKey(addDays(parseKey(key), days))
 
+/**
+ * Der letzte abgeschlossene Tag — der einzige, der neu eingetragen werden darf.
+ * Heute ist bewusst gesperrt: ob der Tag „on track“ war, weiß man erst, wenn er vorbei ist.
+ */
+export const yesterdayKey = (): string => shiftKey(todayKey(), -1)
+
 /** „Sonntag, 6. Juli“ */
 export const fmtDayLong = (key: string): string => format(parseKey(key), 'EEEE, d. MMMM', { locale: de })
 

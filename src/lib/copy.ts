@@ -25,7 +25,9 @@ export const copy = {
 
   today: {
     onTrack: 'On track',
-    notToday: 'Heute nicht',
+    notToday: 'Gestern nicht',
+    notOnTrack: 'Nicht on track',
+    targetDay: (day: string) => `Gestern — ${day}`,
     logged: (day: string, onTrack: boolean) =>
       `Eingetragen: ${day} — ${onTrack ? 'on track' : 'nicht on track'}`,
     change: 'Ändern',
@@ -49,8 +51,9 @@ export const copy = {
     days: (n: number) => `${n} Tage`,
     patterns: 'Muster',
     patternsEmpty: 'Noch nicht genug Daten — Muster erscheinen nach ein paar Einträgen.',
-    patternTags: 'Häufigste Trigger an „Heute nicht“-Tagen',
-    patternWeekdays: 'Wochentage der „Heute nicht“-Tage',
+    // „Heute nicht“-Formulierungen bewusst vermieden: geloggt wird immer der Vortag
+    patternTags: 'Häufigste Trigger an „Nicht on track“-Tagen',
+    patternWeekdays: 'Wochentage der „Nicht on track“-Tage',
     ofTotal: (n: number, total: number) => `${n} von ${total}`,
   },
 

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
 import { copy } from '../lib/copy'
+import { yesterdayKey } from '../lib/dates'
 import { MIN_RELAPSES_FOR_PATTERNS } from '../lib/config'
 import {
   currentMomentum,
@@ -92,12 +93,14 @@ export function Trends() {
     [selected?.id],
   )
   const [span, setSpan] = useState<(typeof SPANS)[number]>(30)
-  const series = useMemo(() => rollingSeries(logs ?? [], span), [logs, span])
+  // Kurve endet am letzten abgeschlossenen Tag — heute kann noch keinen Log haben
+  const anchor = yesterdayKey()
+  const series = useMemo(() => rollingSeries(logs ?? [], span, 30, anchor), [logs, span, anchor])
 
   if (habits === undefined || logs === undefined) return null
 
-  const pct = currentRollingPct(logs)
-  const momentum = currentMomentum(logs)
+  const pct = currentRollingPct(logs, 30, anchor)
+  const momentum = currentMomentum(logs, anchor)
 
   return (
     <div>

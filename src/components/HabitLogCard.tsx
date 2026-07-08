@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, setLogState } from '../lib/db'
 import { copy } from '../lib/copy'
-import { fmtDayShort, todayKey } from '../lib/dates'
+import { fmtDayLong, fmtDayShort, yesterdayKey } from '../lib/dates'
 import { currentMomentum, currentRollingPct } from '../lib/metrics'
 import type { Habit } from '../lib/types'
 import { Card } from './ui'
@@ -10,22 +10,23 @@ import { LogButtons } from './LogButtons'
 import { LogDetails } from './LogDetails'
 
 export function HabitLogCard({ habit }: { habit: Habit }) {
-  const today = todayKey()
+  // Eingetragen wird immer der abgeschlossene Vortag — heute ist noch offen
+  const day = yesterdayKey()
   const log = useLiveQuery(
-    () => db.logs.where('[habit_id+date]').equals([habit.id, today]).first(),
-    [habit.id, today],
+    () => db.logs.where('[habit_id+date]').equals([habit.id, day]).first(),
+    [habit.id, day],
   )
   const logs = useLiveQuery(() => db.logs.where('habit_id').equals(habit.id).toArray(), [habit.id])
   const [editing, setEditing] = useState(false)
   const [panelOpen, setPanelOpen] = useState(false)
 
-  const pct = logs ? currentRollingPct(logs) : null
-  const momentum = currentMomentum(logs ?? [])
+  const pct = logs ? currentRollingPct(logs, 30, day) : null
+  const momentum = currentMomentum(logs ?? [], day)
 
   function choose(onTrack: boolean) {
-    void setLogState(habit.id, today, onTrack)
+    void setLogState(habit.id, day, onTrack)
     setEditing(false)
-    // Bei „Heute nicht“ direkt die optionalen Trigger anbieten (1 Tap entfernt)
+    // Bei „Gestern nicht“ direkt die optionalen Trigger anbieten (1 Tap entfernt)
     setPanelOpen(!onTrack)
   }
 
@@ -37,6 +38,7 @@ export function HabitLogCard({ habit }: { habit: Habit }) {
           {copy.today.statLine(pct === null ? '–' : `${pct} %`, momentum)}
         </span>
       </div>
+      <p className="mt-0.5 text-xs text-faint">{copy.today.targetDay(fmtDayLong(day))}</p>
       <div className="mt-3">
         {log && !editing ? (
           <div className="flex items-center justify-between gap-2">
@@ -50,7 +52,11 @@ export function HabitLogCard({ habit }: { habit: Habit }) {
             </button>
           </div>
         ) : (
-          <LogButtons value={log ? log.on_track : null} onSelect={choose} />
+          <LogButtons
+            value={log ? log.on_track : null}
+            onSelect={choose}
+            negativeLabel={copy.today.notToday}
+          />
         )}
         {log && !log.on_track && panelOpen && (
           <LogDetails log={log} onDone={() => setPanelOpen(false)} />

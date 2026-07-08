@@ -11,7 +11,7 @@
 
 ## Features
 
-- Mehrere Habits, tägliches Log („On track“ / „Heute nicht“)
+- Mehrere Habits, tägliches Log für den **abgeschlossenen Vortag** („On track“ / „Gestern nicht“) — ein Tag wird erst bewertet, wenn er vorbei ist; heute ist bewusst gesperrt
 - Trigger-Tags — Defaults plus eigene, direkt im Log-Flow anlegbar
 - Rolling 30-Tage-% (nicht geloggte Tage zählen nicht gegen dich) + Kurve über 30/60/90 Tage
 - Momentum-Score: +2 pro on-track-Tag, −8 pro Ausrutscher, begrenzt auf 0–100, Start bei 50
@@ -72,6 +72,7 @@ Optional (empfohlen, sobald dein Account existiert): **Authentication → Sign I
 
 ## Wie die Zahlen funktionieren
 
+- **Gestern statt heute:** Eingetragen wird immer der abgeschlossene Vortag — um 14 Uhr weißt du noch nicht, wie der Tag um 23:59 ausgeht. Heute ist deshalb überall gesperrt (auch im Kalender); ältere Tage lassen sich jederzeit nachtragen.
 - **30-Tage-%:** Anteil „on track“ an den *geloggten* Tagen der letzten 30 Kalendertage. Vergessene Tage zählen nicht in den Nenner — Vergessen wird nicht bestraft. Nachtragen geht jederzeit über den Kalender.
 - **Momentum:** startet bei 50, `+2` pro on-track-Tag, `−8` pro „Heute nicht“, immer zwischen 0 und 100. Nicht geloggte Tage frieren den Wert ein. Konstanten in [`src/lib/config.ts`](src/lib/config.ts).
 - **Muster:** erscheinen ab 3 „Heute nicht“-Einträgen — Trigger-Häufigkeit und Wochentagsverteilung.
