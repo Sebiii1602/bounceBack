@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, setLogState } from '../lib/db'
 import { copy } from '../lib/copy'
-import { fmtDayLong, fmtDayShort, yesterdayKey } from '../lib/dates'
+import { fmtDayLong, fmtDayShort, todayKey, yesterdayKey } from '../lib/dates'
 import { currentMomentum, currentRollingPct } from '../lib/metrics'
 import type { Habit } from '../lib/types'
 import { Card } from './ui'
@@ -10,8 +10,9 @@ import { LogButtons } from './LogButtons'
 import { LogDetails } from './LogDetails'
 
 export function HabitLogCard({ habit }: { habit: Habit }) {
-  // Eingetragen wird immer der abgeschlossene Vortag — heute ist noch offen
-  const day = yesterdayKey()
+  // Aktiv-Habits (Gym) sind heute eintragbar, Lass-Habits (Rauchen) erst am Folgetag
+  const sameDay = habit.log_same_day
+  const day = sameDay ? todayKey() : yesterdayKey()
   const log = useLiveQuery(
     () => db.logs.where('[habit_id+date]').equals([habit.id, day]).first(),
     [habit.id, day],
@@ -26,7 +27,7 @@ export function HabitLogCard({ habit }: { habit: Habit }) {
   function choose(onTrack: boolean) {
     void setLogState(habit.id, day, onTrack)
     setEditing(false)
-    // Bei „Gestern nicht“ direkt die optionalen Trigger anbieten (1 Tap entfernt)
+    // Bei „nicht on track“ direkt die optionalen Trigger anbieten (1 Tap entfernt)
     setPanelOpen(!onTrack)
   }
 
@@ -38,7 +39,9 @@ export function HabitLogCard({ habit }: { habit: Habit }) {
           {copy.today.statLine(pct === null ? '–' : `${pct} %`, momentum)}
         </span>
       </div>
-      <p className="mt-0.5 text-xs text-faint">{copy.today.targetDay(fmtDayLong(day))}</p>
+      <p className="mt-0.5 text-xs text-faint">
+        {sameDay ? copy.today.targetToday(fmtDayLong(day)) : copy.today.targetYesterday(fmtDayLong(day))}
+      </p>
       <div className="mt-3">
         {log && !editing ? (
           <div className="flex items-center justify-between gap-2">
@@ -55,7 +58,7 @@ export function HabitLogCard({ habit }: { habit: Habit }) {
           <LogButtons
             value={log ? log.on_track : null}
             onSelect={choose}
-            negativeLabel={copy.today.notToday}
+            negativeLabel={sameDay ? copy.today.notToday : copy.today.notYesterday}
           />
         )}
         {log && !log.on_track && panelOpen && (

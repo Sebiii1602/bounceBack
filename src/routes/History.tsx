@@ -72,7 +72,12 @@ export function History() {
             </svg>
           </button>
         </div>
-        <CalendarGrid month={month} logsByDate={logsByDate} onPick={setSheetDate} />
+        <CalendarGrid
+          month={month}
+          logsByDate={logsByDate}
+          onPick={setSheetDate}
+          allowToday={selected?.log_same_day ?? false}
+        />
         <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-soft">
           <LegendDot className="border border-track/30 bg-track-soft" label={copy.history.legendOnTrack} />
           <LegendDot className="border border-slip/30 bg-slip-soft" label={copy.history.legendNot} />

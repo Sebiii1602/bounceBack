@@ -1,12 +1,13 @@
 import { useState, type ReactNode } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { addHabit, addTag, db, deleteTag, renameHabit, renameTag } from '../lib/db'
+import { addHabit, addTag, db, deleteTag, renameHabit, renameTag, setHabitLogMode } from '../lib/db'
 import { copy } from '../lib/copy'
 import { APP_VERSION } from '../lib/config'
 import { fmtTime } from '../lib/dates'
 import { deleteHabitEverywhere, syncNow, useSyncStatus } from '../lib/sync'
 import { useAuth } from '../lib/auth'
 import { Card, SectionLabel, PageTitle } from '../components/ui'
+import { LogModeChips } from '../components/LogModeChips'
 
 function IconButton({ onClick, label, children }: { onClick: () => void; label: string; children: ReactNode }) {
   return (
@@ -50,6 +51,8 @@ function NameList({
   onRename,
   onDelete,
   confirmMsg,
+  renderMeta,
+  addExtra,
 }: {
   items: NamedItem[]
   addPlaceholder: string
@@ -57,6 +60,10 @@ function NameList({
   onRename: (id: string, label: string) => Promise<unknown>
   onDelete: (id: string) => Promise<unknown>
   confirmMsg: (label: string) => string
+  /** Optionaler Zusatz pro Zeile (z. B. Eintrag-Modus-Chip bei Habits) */
+  renderMeta?: (item: NamedItem) => ReactNode
+  /** Optionaler Zusatz unter dem Hinzufügen-Formular */
+  addExtra?: ReactNode
 }) {
   const [draft, setDraft] = useState('')
   const [editId, setEditId] = useState<string | null>(null)
@@ -89,7 +96,8 @@ function NameList({
           ) : (
             <div key={item.id} className="flex items-center justify-between py-1.5">
               <span className="text-sm">{item.label}</span>
-              <div className="flex gap-0.5">
+              <div className="flex items-center gap-0.5">
+                {renderMeta?.(item)}
                 <IconButton
                   label={copy.common.rename}
                   onClick={() => {
@@ -131,6 +139,7 @@ function NameList({
           {copy.common.add}
         </button>
       </form>
+      {addExtra && <div className="mt-2">{addExtra}</div>}
     </div>
   )
 }
@@ -198,6 +207,7 @@ export function More() {
     [],
   )
   const { cloud, session, signOut } = useAuth()
+  const [newSameDay, setNewSameDay] = useState(false)
 
   async function removeHabit(id: string) {
     try {
@@ -215,10 +225,25 @@ export function More() {
         <NameList
           items={(habits ?? []).map((h) => ({ id: h.id, label: h.name }))}
           addPlaceholder={copy.more.addHabit}
-          onAdd={addHabit}
+          onAdd={(name) => addHabit(name, newSameDay)}
           onRename={renameHabit}
           onDelete={removeHabit}
           confirmMsg={copy.more.deleteHabitConfirm}
+          renderMeta={(item) => {
+            const habit = habits?.find((h) => h.id === item.id)
+            if (!habit) return null
+            return (
+              <button
+                type="button"
+                onClick={() => void setHabitLogMode(habit.id, !habit.log_same_day)}
+                title={copy.today.modeHint}
+                className="mr-1 rounded-full border border-line px-2 py-0.5 text-[11px] text-soft transition hover:text-ink"
+              >
+                {habit.log_same_day ? copy.more.logModeSame : copy.more.logModeNext}
+              </button>
+            )
+          }}
+          addExtra={<LogModeChips value={newSameDay} onChange={setNewSameDay} />}
         />
       </Card>
       <Card className="mt-3">

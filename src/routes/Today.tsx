@@ -5,19 +5,25 @@ import { copy } from '../lib/copy'
 import { fmtDayLong, todayKey } from '../lib/dates'
 import { Card, PageTitle } from '../components/ui'
 import { HabitLogCard } from '../components/HabitLogCard'
+import { LogModeChips } from '../components/LogModeChips'
 
 function EmptyState() {
   const [name, setName] = useState('')
+  const [sameDay, setSameDay] = useState(false)
   return (
     <Card>
       <h2 className="text-base font-semibold">{copy.today.emptyTitle}</h2>
       <p className="mt-1 text-sm text-soft">{copy.today.emptyHint}</p>
+      <div className="mt-4 space-y-2">
+        <LogModeChips value={sameDay} onChange={setSameDay} />
+        <p className="text-xs text-faint">{copy.today.modeHint}</p>
+      </div>
       <form
-        className="mt-4 flex gap-2"
+        className="mt-3 flex gap-2"
         onSubmit={(e) => {
           e.preventDefault()
           if (name.trim() === '') return
-          void addHabit(name)
+          void addHabit(name, sameDay)
           setName('')
         }}
       >

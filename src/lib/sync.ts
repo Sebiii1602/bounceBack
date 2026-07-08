@@ -93,7 +93,7 @@ function normalize(table: SyncTable, raw: RemoteRow): Habit | Tag | LogEntry {
     updated_at: raw.updated_at as string,
   }
   return table === 'habits'
-    ? { ...base, name: raw.name as string }
+    ? { ...base, name: raw.name as string, log_same_day: (raw.log_same_day as boolean | null) ?? false }
     : { ...base, label: raw.label as string }
 }
 

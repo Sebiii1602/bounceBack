@@ -21,6 +21,24 @@ db.version(1).stores({
   meta: 'key',
 })
 
+// v2: habits.log_same_day (kein neuer Index nötig, nur Backfill für Bestandsdaten)
+db.version(2)
+  .stores({
+    habits: 'id, updated_at',
+    logs: 'id, [habit_id+date], habit_id, updated_at',
+    tags: 'id, label, updated_at',
+    outbox: '++seq, row_id',
+    meta: 'key',
+  })
+  .upgrade((tx) =>
+    tx
+      .table('habits')
+      .toCollection()
+      .modify((h) => {
+        if (h.log_same_day === undefined) h.log_same_day = false
+      }),
+  )
+
 db.on('populate', (tx) => {
   const t = nowIso()
   void tx
@@ -42,14 +60,21 @@ async function enqueue(table: SyncTable, op: 'upsert' | 'delete', rowId: string)
   await db.outbox.add({ table, op, row_id: rowId })
 }
 
-export async function addHabit(name: string): Promise<string> {
+export async function addHabit(name: string, logSameDay = false): Promise<string> {
   const id = crypto.randomUUID()
   const t = nowIso()
   await db.transaction('rw', db.habits, db.outbox, async () => {
-    await db.habits.add({ id, name: name.trim(), created_at: t, updated_at: t })
+    await db.habits.add({ id, name: name.trim(), log_same_day: logSameDay, created_at: t, updated_at: t })
     await enqueue('habits', 'upsert', id)
   })
   return id
+}
+
+export async function setHabitLogMode(id: string, logSameDay: boolean): Promise<void> {
+  await db.transaction('rw', db.habits, db.outbox, async () => {
+    await db.habits.update(id, { log_same_day: logSameDay, updated_at: nowIso() })
+    await enqueue('habits', 'upsert', id)
+  })
 }
 
 export async function renameHabit(id: string, name: string): Promise<void> {

@@ -1,6 +1,8 @@
 export interface Habit {
   id: string
   name: string
+  /** true = am selben Tag eintragbar (Aktiv-Habit, z. B. Gym); false = erst am Folgetag (Lass-Habit, z. B. Rauchen) */
+  log_same_day: boolean
   created_at: string
   updated_at: string
 }

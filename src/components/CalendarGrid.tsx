@@ -10,10 +10,13 @@ export function CalendarGrid({
   month,
   logsByDate,
   onPick,
+  allowToday = false,
 }: {
   month: Date
   logsByDate: Map<string, boolean>
   onPick: (dateKey: string) => void
+  /** Aktiv-Habits dürfen auch heute eintragen, Lass-Habits erst ab morgen */
+  allowToday?: boolean
 }) {
   const days = eachDayOfInterval({
     start: startOfWeek(startOfMonth(month), { weekStartsOn: 1 }),
@@ -32,8 +35,7 @@ export function CalendarGrid({
         const key = dateKey(day)
         if (!isSameMonth(day, month)) return <div key={key} />
         const state = logsByDate.get(key)
-        // Heute ist noch nicht bewertbar — nur abgeschlossene Tage sind antippbar
-        const locked = key >= today
+        const locked = allowToday ? key > today : key >= today
         const isToday = key === today
 
         let cls: string

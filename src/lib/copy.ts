@@ -25,9 +25,11 @@ export const copy = {
 
   today: {
     onTrack: 'On track',
-    notToday: 'Gestern nicht',
+    notToday: 'Heute nicht',
+    notYesterday: 'Gestern nicht',
     notOnTrack: 'Nicht on track',
-    targetDay: (day: string) => `Gestern — ${day}`,
+    targetToday: (day: string) => `Heute — ${day}`,
+    targetYesterday: (day: string) => `Gestern — ${day}`,
     logged: (day: string, onTrack: boolean) =>
       `Eingetragen: ${day} — ${onTrack ? 'on track' : 'nicht on track'}`,
     change: 'Ändern',
@@ -38,6 +40,7 @@ export const copy = {
     done: 'Fertig',
     emptyTitle: 'Leg deinen ersten Habit an',
     emptyHint: 'Das, worum es gerade geht. Weitere kannst du später unter „Mehr“ hinzufügen.',
+    modeHint: 'Aktives (Gym) trägst du am selben Tag ein — Lassen (z. B. Rauchen) erst am Folgetag, wenn der Tag rum ist.',
     habitNamePlaceholder: 'Name des Habits',
     start: 'Los geht’s',
     statLine: (pct: string, momentum: number) => `30 Tage: ${pct} · Momentum ${momentum}`,
@@ -51,7 +54,6 @@ export const copy = {
     days: (n: number) => `${n} Tage`,
     patterns: 'Muster',
     patternsEmpty: 'Noch nicht genug Daten — Muster erscheinen nach ein paar Einträgen.',
-    // „Heute nicht“-Formulierungen bewusst vermieden: geloggt wird immer der Vortag
     patternTags: 'Häufigste Trigger an „Nicht on track“-Tagen',
     patternWeekdays: 'Wochentage der „Nicht on track“-Tage',
     ofTotal: (n: number, total: number) => `${n} von ${total}`,
@@ -67,6 +69,8 @@ export const copy = {
   more: {
     habits: 'Habits',
     addHabit: 'Neuer Habit…',
+    logModeSame: 'Gleicher Tag',
+    logModeNext: 'Folgetag',
     deleteHabitConfirm: (name: string) => `„${name}“ und alle zugehörigen Einträge löschen?`,
     habitDeleteOnlineOnly: 'Habits löschen geht nur mit Internetverbindung.',
     tags: 'Trigger-Tags',
