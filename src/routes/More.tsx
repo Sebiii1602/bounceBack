@@ -217,6 +217,14 @@ export function More() {
     }
   }
 
+  async function handleSignOut() {
+    try {
+      await signOut()
+    } catch {
+      window.alert(copy.more.signOutOfflineError)
+    }
+  }
+
   return (
     <div>
       <PageTitle title={copy.tabs.more} />
@@ -265,7 +273,7 @@ export function More() {
             <span className="truncate text-sm text-soft">{session.user.email}</span>
             <button
               type="button"
-              onClick={() => void signOut()}
+              onClick={() => void handleSignOut()}
               className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-sm text-soft transition hover:text-ink"
             >
               {copy.more.signOut}

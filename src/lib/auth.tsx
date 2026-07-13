@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from './supabase'
 import { onSignedIn } from './sync'
+import { clearLocalData } from './db'
 
 interface AuthValue {
   /** false = lokaler Modus ohne Supabase-Keys */
@@ -50,7 +51,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signOut(): Promise<void> {
-    await supabase!.auth.signOut()
+    const { error } = await supabase!.auth.signOut()
+    if (error) throw error
+    // Erst nach bestätigtem Abmelden räumen — sonst würde ein Versuch offline
+    // die lokalen Daten löschen, obwohl die Session clientseitig weiterbesteht.
+    await clearLocalData()
   }
 
   return (

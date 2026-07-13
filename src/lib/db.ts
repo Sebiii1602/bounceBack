@@ -39,12 +39,35 @@ db.version(2)
       }),
   )
 
-db.on('populate', (tx) => {
+/** Frisch vergebene IDs pro Zeile (nie feste UUIDs — siehe config.ts). */
+function buildDefaultTagRows(): Tag[] {
   const t = nowIso()
-  void tx
-    .table('tags')
-    .bulkAdd(DEFAULT_TAGS.map((d) => ({ ...d, created_at: t, updated_at: t })))
+  return DEFAULT_TAGS.map((label) => ({ id: crypto.randomUUID(), label, created_at: t, updated_at: t }))
+}
+
+/** Sät die Start-Trigger neu — z. B. nachdem `clearLocalData()` das Gerät geleert hat. */
+export async function seedDefaultTags(): Promise<void> {
+  await db.tags.bulkAdd(buildDefaultTagRows())
+}
+
+db.on('populate', (tx) => {
+  void tx.table('tags').bulkAdd(buildDefaultTagRows())
 })
+
+/**
+ * Löscht alle lokalen Daten (z. B. beim Abmelden) und sät die Start-Trigger
+ * neu, damit das Gerät für den nächsten Account/Login sauber dasteht.
+ */
+export async function clearLocalData(): Promise<void> {
+  await db.transaction('rw', db.habits, db.logs, db.tags, db.outbox, db.meta, async () => {
+    await db.habits.clear()
+    await db.logs.clear()
+    await db.tags.clear()
+    await db.outbox.clear()
+    await db.meta.clear()
+    await seedDefaultTags()
+  })
+}
 
 /**
  * Merkt eine Zeile für den Sync vor. Upserts werden pro Zeile dedupliziert;

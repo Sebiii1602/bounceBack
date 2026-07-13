@@ -36,7 +36,7 @@ Damit Mac und iPhone dieselben Daten sehen (und du ein Backup hast):
 
 1. Auf [supabase.com](https://supabase.com) registrieren (Login mit GitHub geht am schnellsten).
 2. **New project** → Name z. B. `bounceback`, Datenbank-Passwort generieren lassen (musst du dir nicht merken), Region **Frankfurt (eu-central-1)** → warten bis das Projekt bereit ist.
-3. Links **SQL Editor** öffnen → kompletten Inhalt von [`supabase/schema.sql`](supabase/schema.sql) einfügen → **Run**. („Success. No rows returned“ ist das erwartete Ergebnis.) *Schema schon vor dem 08.07.2026 eingespielt? Dann einmal [`supabase/migration-2026-07-08-log-mode.sql`](supabase/migration-2026-07-08-log-mode.sql) ausführen.*
+3. Links **SQL Editor** öffnen → kompletten Inhalt von [`supabase/schema.sql`](supabase/schema.sql) einfügen → **Run**. („Success. No rows returned“ ist das erwartete Ergebnis.) *Schema schon vor dem 08.07.2026 eingespielt? Dann einmal [`supabase/migration-2026-07-08-log-mode.sql`](supabase/migration-2026-07-08-log-mode.sql) ausführen. Schema schon vor dem 14.07.2026 eingespielt? Zusätzlich [`supabase/migration-2026-07-14-tags-per-account.sql`](supabase/migration-2026-07-14-tags-per-account.sql) (Kommentar darin vorher beachten — Pre-Flight-Check auf Duplikate).*
 4. **Project Settings → API**: `Project URL` und den `anon public` Key kopieren.
 5. Im Projektordner:
    ```bash
@@ -49,7 +49,7 @@ Damit Mac und iPhone dieselben Daten sehen (und du ein Backup hast):
 **Falls die Bestätigungs-Mail nicht ankommt** (auch im Spam nicht — Supabase' eingebauter Mailer ist limitiert):
 Dashboard → **Authentication → Sign In / Up → „Confirm email“ ausschalten**, dann unter **Authentication → Users** den halb angelegten Account löschen und in der App einfach nochmal registrieren — geht dann sofort ohne Mail. Die App kann beide Modi, Code-Änderungen sind nicht nötig.
 
-Optional (empfohlen, sobald dein Account existiert): **Authentication → Sign In / Up → „Allow new users to sign up“ ausschalten** — dann kann niemand sonst ein Konto auf deinem Projekt anlegen.
+**„Allow new users to sign up“ bleibt an** — Kollegen, denen du den Link schickst, registrieren sich über dieselbe URL mit eigener E-Mail + Passwort und bekommen automatisch ihren eigenen, per RLS getrennten Datenbereich; niemand sieht die Habits/Logs eines anderen Accounts. Nur falls die App irgendwann ausschließlich für dich allein bleiben soll, ließe sich der Toggle abschalten.
 
 > Hinweis Free Tier: Nach ~1 Woche ohne Nutzung pausiert Supabase das Projekt. Die App läuft dann lokal weiter; im Dashboard „Restore“ klicken und der Sync holt alles nach.
 

@@ -51,3 +51,7 @@ create policy "own logs" on public.logs
 create index if not exists habits_updated_at_idx on public.habits (updated_at);
 create index if not exists tags_updated_at_idx on public.tags (updated_at);
 create index if not exists logs_updated_at_idx on public.logs (updated_at);
+
+-- Sync-Schlüssel für Tags: IDs werden pro Gerät frisch vergeben (wie bei logs),
+-- Konvergenz läuft über (user_id, label) statt über eine feste ID.
+create unique index if not exists tags_user_label_idx on public.tags (user_id, label);

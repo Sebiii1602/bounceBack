@@ -11,16 +11,17 @@ export const MOMENTUM = {
 export const MIN_RELAPSES_FOR_PATTERNS = 3
 
 /**
- * Feste UUIDs: jedes Gerät seedet identische Zeilen, damit die Defaults
- * beim Sync zusammenfallen statt sich zu duplizieren.
+ * Labels der Start-Trigger — IDs werden pro Gerät frisch vergeben (wie überall
+ * sonst). Konvergenz über mehrere Geräte desselben Accounts läuft über den
+ * `(user_id, label)`-Unique-Key beim Sync, nicht über eine feste ID.
  */
-export const DEFAULT_TAGS: ReadonlyArray<{ id: string; label: string }> = [
-  { id: '00000000-0000-4000-8000-000000000001', label: 'Gestresst' },
-  { id: '00000000-0000-4000-8000-000000000002', label: 'Einsam' },
-  { id: '00000000-0000-4000-8000-000000000003', label: 'Müde' },
-  { id: '00000000-0000-4000-8000-000000000004', label: 'Gelangweilt' },
-  { id: '00000000-0000-4000-8000-000000000005', label: 'Vor Besuch' },
-  { id: '00000000-0000-4000-8000-000000000006', label: 'Sonstiges' },
+export const DEFAULT_TAGS: readonly string[] = [
+  'Gestresst',
+  'Einsam',
+  'Müde',
+  'Gelangweilt',
+  'Vor Besuch',
+  'Sonstiges',
 ]
 
 export const APP_VERSION = '0.1.0'

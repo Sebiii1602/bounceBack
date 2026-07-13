@@ -51,9 +51,9 @@ async function pushOutbox(): Promise<void> {
     const rowIds = [...new Set(upserts.map((o) => o.row_id))]
     const rows = (await db.table(table).bulkGet(rowIds)).filter((r) => r !== undefined)
     if (rows.length > 0) {
-      const { error } = await supabase!
-        .from(table)
-        .upsert(rows, { onConflict: table === 'logs' ? 'habit_id,date' : 'id' })
+      const onConflict =
+        table === 'logs' ? 'habit_id,date' : table === 'tags' ? 'user_id,label' : 'id'
+      const { error } = await supabase!.from(table).upsert(rows, { onConflict })
       if (error) throw error
     }
     await db.outbox.bulkDelete(upserts.map((o) => o.seq))
@@ -125,6 +125,14 @@ async function pullTable(table: SyncTable): Promise<void> {
         if (dup && dup.id !== log.id) {
           if (pending.has(dup.id) && newerOrEqual(dup.updated_at, log.updated_at)) continue
           await db.logs.delete(dup.id)
+        }
+      } else if (table === 'tags') {
+        const tag = row as Tag
+        // Gleiches Label unter anderer ID (z. B. zweites Gerät hat es frisch geseedet)? Dublette ersetzen
+        const dup = await db.tags.where('label').equals(tag.label).first()
+        if (dup && dup.id !== tag.id) {
+          if (pending.has(dup.id) && newerOrEqual(dup.updated_at, tag.updated_at)) continue
+          await db.tags.delete(dup.id)
         }
       }
       await db.table(table).put(row)

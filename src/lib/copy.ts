@@ -86,6 +86,7 @@ export const copy = {
     lastSync: (t: string) => `Zuletzt: ${t}`,
     account: 'Account',
     signOut: 'Abmelden',
+    signOutOfflineError: 'Abmelden geht nur mit Internetverbindung.',
     exportCsv: 'CSV-Export',
     exportSoon: 'bald',
   },
