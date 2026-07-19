@@ -10,9 +10,15 @@ export type SyncState = 'disabled' | 'offline' | 'syncing' | 'synced' | 'error'
 export interface SyncSnapshot {
   state: SyncState
   lastSyncAt: string | null
+  /** Klartext des letzten Fehlers — wird unter „Mehr“ angezeigt statt nur eines Punkts */
+  lastError: string | null
 }
 
-let snapshot: SyncSnapshot = { state: supabase ? 'offline' : 'disabled', lastSyncAt: null }
+let snapshot: SyncSnapshot = {
+  state: supabase ? 'offline' : 'disabled',
+  lastSyncAt: null,
+  lastError: null,
+}
 const listeners = new Set<() => void>()
 
 function setSnapshot(next: Partial<SyncSnapshot>): void {
@@ -41,35 +47,62 @@ const TABLE_ORDER: readonly SyncTable[] = ['habits', 'tags', 'logs']
 const newerOrEqual = (a: string, b: string): boolean =>
   new Date(a).getTime() >= new Date(b).getTime()
 
-async function pushOutbox(): Promise<void> {
-  const ops = await db.outbox.orderBy('seq').toArray()
-  if (ops.length === 0) return
+/** Supabase-Fehler sind keine Error-Instanzen, sondern plain objects mit `message`. */
+const errMsg = (err: unknown): string => {
+  if (err instanceof Error) return err.message
+  if (typeof err === 'object' && err !== null && 'message' in err) {
+    return String((err as { message: unknown }).message)
+  }
+  return String(err)
+}
 
-  for (const table of TABLE_ORDER) {
+/**
+ * Pusht pro Tabelle isoliert: ein Problem bei einer Tabelle (z. B. fehlende
+ * Migration) darf die anderen nicht blockieren. Fehlgeschlagene Zeilen bleiben
+ * in der Outbox und werden beim nächsten Sync erneut versucht.
+ * Gibt die erste Fehlermeldung zurück (oder null).
+ */
+async function pushOutbox(): Promise<string | null> {
+  const ops = await db.outbox.orderBy('seq').toArray()
+  if (ops.length === 0) return null
+  let firstError: string | null = null
+
+  // habits zuerst (logs referenzieren sie), tags zuletzt — Tag-Probleme
+  // dürfen den Habit/Log-Sync nie mitreißen.
+  for (const table of ['habits', 'logs', 'tags'] as const) {
     const upserts = ops.filter((o) => o.table === table && o.op === 'upsert')
     if (upserts.length === 0) continue
-    const rowIds = [...new Set(upserts.map((o) => o.row_id))]
-    const rows = (await db.table(table).bulkGet(rowIds)).filter((r) => r !== undefined)
-    if (rows.length > 0) {
-      const onConflict =
-        table === 'logs' ? 'habit_id,date' : table === 'tags' ? 'user_id,label' : 'id'
-      const { error } = await supabase!.from(table).upsert(rows, { onConflict })
-      if (error) throw error
+    try {
+      const rowIds = [...new Set(upserts.map((o) => o.row_id))]
+      const rows = (await db.table(table).bulkGet(rowIds)).filter((r) => r !== undefined)
+      if (rows.length > 0) {
+        const onConflict =
+          table === 'logs' ? 'habit_id,date' : table === 'tags' ? 'user_id,label' : 'id'
+        const { error } = await supabase!.from(table).upsert(rows, { onConflict })
+        if (error) throw error
+      }
+      await db.outbox.bulkDelete(upserts.map((o) => o.seq))
+    } catch (err) {
+      firstError ??= errMsg(err)
     }
-    await db.outbox.bulkDelete(upserts.map((o) => o.seq))
   }
 
-  // Deletes nach den Upserts; umgekehrte Tabellen-Reihenfolge wegen FKs
-  for (const table of [...TABLE_ORDER].reverse()) {
+  // Deletes nach den Upserts; umgekehrte Reihenfolge wegen FKs
+  for (const table of ['tags', 'logs', 'habits'] as const) {
     const dels = ops.filter((o) => o.table === table && o.op === 'delete')
     if (dels.length === 0) continue
-    const { error } = await supabase!
-      .from(table)
-      .delete()
-      .in('id', [...new Set(dels.map((o) => o.row_id))])
-    if (error) throw error
-    await db.outbox.bulkDelete(dels.map((o) => o.seq))
+    try {
+      const { error } = await supabase!
+        .from(table)
+        .delete()
+        .in('id', [...new Set(dels.map((o) => o.row_id))])
+      if (error) throw error
+      await db.outbox.bulkDelete(dels.map((o) => o.seq))
+    } catch (err) {
+      firstError ??= errMsg(err)
+    }
   }
+  return firstError
 }
 
 type RemoteRow = Record<string, unknown>
@@ -155,14 +188,20 @@ export async function syncNow(): Promise<void> {
   syncing = true
   setSnapshot({ state: 'syncing' })
   try {
-    await pushOutbox()
+    const pushError = await pushOutbox()
     for (const table of TABLE_ORDER) await pullTable(table)
+    if (pushError) {
+      console.error('[sync]', pushError)
+      setSnapshot({ state: 'error', lastError: pushError })
+      return
+    }
     const t = nowIso()
     await db.meta.put({ key: 'last_sync', value: t })
-    setSnapshot({ state: 'synced', lastSyncAt: t })
+    setSnapshot({ state: 'synced', lastSyncAt: t, lastError: null })
   } catch (err) {
-    console.error('[sync]', err)
-    setSnapshot({ state: 'error' })
+    const message = errMsg(err)
+    console.error('[sync]', message)
+    setSnapshot({ state: 'error', lastError: message })
   } finally {
     syncing = false
   }

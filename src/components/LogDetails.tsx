@@ -24,12 +24,13 @@ export function LogDetails({ log, onDone }: { log: LogEntry; onDone?: () => void
         <SectionLabel>{copy.today.triggers}</SectionLabel>
         <TagPicker selected={log.trigger_tags} onToggle={(label) => void toggleLogTag(log.id, label)} />
       </div>
-      <input
+      <textarea
         value={note}
         onChange={(e) => setNote(e.target.value)}
         onBlur={saveNote}
         placeholder={copy.today.notePlaceholder}
-        className="w-full rounded-xl border border-line bg-paper px-3.5 py-2.5 text-sm outline-none focus:border-track"
+        rows={3}
+        className="w-full resize-none rounded-xl border border-line bg-paper px-3.5 py-2.5 text-sm outline-none focus:border-track"
       />
       {onDone && (
         <button

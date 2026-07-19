@@ -38,9 +38,14 @@ export function DaySheet({
         </div>
         <LogButtons
           value={log ? log.on_track : null}
-          onSelect={(onTrack) => void setLogState(habit.id, date, onTrack)}
+          onSelect={(onTrack) => {
+            void setLogState(habit.id, date, onTrack)
+            // „On track“ braucht keine Details mehr — Sheet direkt zu.
+            // Bei „Nicht on track“ bleibt es für die optionalen Trigger offen.
+            if (onTrack) onClose()
+          }}
         />
-        {log && !log.on_track && <LogDetails log={log} />}
+        {log && !log.on_track && <LogDetails log={log} onDone={onClose} />}
         {log && (
           <button
             type="button"

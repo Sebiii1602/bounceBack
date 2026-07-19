@@ -193,6 +193,9 @@ function SyncCard() {
       {status.lastSyncAt && (
         <p className="mt-2 text-xs text-faint">{copy.more.lastSync(fmtTime(status.lastSyncAt))}</p>
       )}
+      {status.state === 'error' && status.lastError && (
+        <p className="mt-2 break-words text-xs text-slip-deep">{status.lastError}</p>
+      )}
     </Card>
   )
 }
