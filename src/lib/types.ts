@@ -14,8 +14,8 @@ export interface LogEntry {
   date: string
   on_track: boolean
   /**
-   * Special Day: Tag ist markiert (blau) statt bewertet — zählt nicht in
-   * Prozent/Momentum. `on_track` ist dann nur ein maskierter Platzhalter.
+   * Special Day: Highlight-Markierung (blau) für richtig gute Tage.
+   * Zählt ganz normal als on track — `special` ist nur die Krone obendrauf.
    */
   special: boolean
   trigger_tags: string[]

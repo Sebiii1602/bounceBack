@@ -155,13 +155,16 @@ export async function setLogState(habitId: string, date: string, onTrack: boolea
   })
 }
 
-/** Markiert (Habit, Tag) als Special Day — wertungsfrei, zählt nicht in die Metriken. */
+/**
+ * Markiert (Habit, Tag) als Special Day — ein Highlight-Tag, der ganz normal
+ * als on track zählt und nur zusätzlich blau hervorgehoben wird.
+ */
 export async function setLogSpecial(habitId: string, date: string): Promise<void> {
   await db.transaction('rw', db.logs, db.outbox, async () => {
     const existing = await db.logs.where('[habit_id+date]').equals([habitId, date]).first()
     const t = nowIso()
     if (existing) {
-      await db.logs.update(existing.id, { special: true, updated_at: t })
+      await db.logs.update(existing.id, { on_track: true, special: true, updated_at: t })
       await enqueue('logs', 'upsert', existing.id)
     } else {
       const id = crypto.randomUUID()
@@ -169,7 +172,6 @@ export async function setLogSpecial(habitId: string, date: string): Promise<void
         id,
         habit_id: habitId,
         date,
-        // Platzhalter — wird durch `special` maskiert und zählt nicht
         on_track: true,
         special: true,
         trigger_tags: [],

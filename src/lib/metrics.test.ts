@@ -97,29 +97,21 @@ describe('momentum', () => {
 })
 
 describe('special days', () => {
-  it('zählen nicht in den 30-Tage-Prozentwert', () => {
+  it('zählen ganz normal als on track in Prozent und Momentum', () => {
     const logs = [
       mkLog('2026-07-04', true),
-      mkLog('2026-07-05', true, [], true), // Special Day — maskiert
+      mkLog('2026-07-05', true, [], true), // Special Day — Highlight, aber on track
       mkLog('2026-07-06', false),
     ]
-    // Nur 04. (on) und 06. (nicht) zählen → 50 %
-    expect(currentRollingPct(logs, 30, TODAY)).toBe(50)
+    // 04. + 05. on, 06. nicht → 2 von 3 ≈ 67 %
+    expect(currentRollingPct(logs, 30, TODAY)).toBe(67)
+    expect(currentMomentum(logs, TODAY)).toBe(50 + 2 + 2 - 8)
   })
 
-  it('frieren das Momentum ein wie ungeloggte Tage', () => {
-    const logs = [
-      mkLog('2026-07-04', true),
-      mkLog('2026-07-05', false, [], true), // Special mit maskiertem on_track=false
-      mkLog('2026-07-06', true),
-    ]
-    expect(currentMomentum(logs, TODAY)).toBe(50 + 2 + 2)
-  })
-
-  it('tauchen nicht in den Trigger-Mustern auf', () => {
+  it('tauchen nicht in den Trigger-Mustern auf (sie sind on track)', () => {
     const logs = [
       mkLog('2026-07-01', false, ['Einsam']),
-      mkLog('2026-07-02', false, ['Party'], true), // Special — Tags bleiben, zählen aber nicht
+      mkLog('2026-07-02', true, ['Freundin'], true), // Special — Tags nur fürs Erinnern
     ]
     const stats = tagStats(logs)
     expect(stats).toEqual([{ label: 'Einsam', count: 1, share: 1 }])
