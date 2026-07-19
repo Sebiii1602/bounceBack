@@ -13,6 +13,11 @@ export interface LogEntry {
   /** Lokales Kalenderdatum als 'yyyy-MM-dd' */
   date: string
   on_track: boolean
+  /**
+   * Special Day: Tag ist markiert (blau) statt bewertet — zählt nicht in
+   * Prozent/Momentum. `on_track` ist dann nur ein maskierter Platzhalter.
+   */
+  special: boolean
   trigger_tags: string[]
   note: string | null
   created_at: string

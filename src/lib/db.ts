@@ -50,6 +50,24 @@ export async function seedDefaultTags(): Promise<void> {
   await db.tags.bulkAdd(buildDefaultTagRows())
 }
 
+// v3: logs.special (Special Days — markiert statt bewertet)
+db.version(3)
+  .stores({
+    habits: 'id, updated_at',
+    logs: 'id, [habit_id+date], habit_id, updated_at',
+    tags: 'id, label, updated_at',
+    outbox: '++seq, row_id',
+    meta: 'key',
+  })
+  .upgrade((tx) =>
+    tx
+      .table('logs')
+      .toCollection()
+      .modify((l) => {
+        if (l.special === undefined) l.special = false
+      }),
+  )
+
 db.on('populate', (tx) => {
   void tx.table('tags').bulkAdd(buildDefaultTagRows())
 })
@@ -107,18 +125,17 @@ export async function renameHabit(id: string, name: string): Promise<void> {
   })
 }
 
-/** Setzt den Zustand für (Habit, Tag) — legt den Log an oder aktualisiert ihn. */
+/**
+ * Bewertet (Habit, Tag) — legt den Log an oder aktualisiert ihn.
+ * Nimmt einem Special Day die Markierung, aber Notiz und Trigger bleiben:
+ * was du notiert hast, bleibt — nur die Farbe wechselt.
+ */
 export async function setLogState(habitId: string, date: string, onTrack: boolean): Promise<void> {
   await db.transaction('rw', db.logs, db.outbox, async () => {
     const existing = await db.logs.where('[habit_id+date]').equals([habitId, date]).first()
     const t = nowIso()
     if (existing) {
-      await db.logs.update(existing.id, {
-        on_track: onTrack,
-        // Beim Wechsel auf „on track“ sind Trigger gegenstandslos
-        trigger_tags: onTrack ? [] : existing.trigger_tags,
-        updated_at: t,
-      })
+      await db.logs.update(existing.id, { on_track: onTrack, special: false, updated_at: t })
       await enqueue('logs', 'upsert', existing.id)
     } else {
       const id = crypto.randomUUID()
@@ -127,6 +144,34 @@ export async function setLogState(habitId: string, date: string, onTrack: boolea
         habit_id: habitId,
         date,
         on_track: onTrack,
+        special: false,
+        trigger_tags: [],
+        note: null,
+        created_at: t,
+        updated_at: t,
+      })
+      await enqueue('logs', 'upsert', id)
+    }
+  })
+}
+
+/** Markiert (Habit, Tag) als Special Day — wertungsfrei, zählt nicht in die Metriken. */
+export async function setLogSpecial(habitId: string, date: string): Promise<void> {
+  await db.transaction('rw', db.logs, db.outbox, async () => {
+    const existing = await db.logs.where('[habit_id+date]').equals([habitId, date]).first()
+    const t = nowIso()
+    if (existing) {
+      await db.logs.update(existing.id, { special: true, updated_at: t })
+      await enqueue('logs', 'upsert', existing.id)
+    } else {
+      const id = crypto.randomUUID()
+      await db.logs.add({
+        id,
+        habit_id: habitId,
+        date,
+        // Platzhalter — wird durch `special` maskiert und zählt nicht
+        on_track: true,
+        special: true,
         trigger_tags: [],
         note: null,
         created_at: t,

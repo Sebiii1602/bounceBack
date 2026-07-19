@@ -33,7 +33,8 @@ const clamp = (v: number, min: number, max: number): number => Math.min(max, Mat
 
 function logMap(logs: LogEntry[]): Map<string, boolean> {
   const m = new Map<string, boolean>()
-  for (const l of logs) m.set(l.date, l.on_track)
+  // Special Days sind markiert, nicht bewertet — für alle Metriken wie ungeloggt
+  for (const l of logs) if (!l.special) m.set(l.date, l.on_track)
   return m
 }
 
@@ -109,7 +110,7 @@ export function currentMomentum(logs: LogEntry[], today = todayKey()): number {
 }
 
 export function relapseLogs(logs: LogEntry[]): LogEntry[] {
-  return logs.filter((l) => !l.on_track)
+  return logs.filter((l) => !l.on_track && !l.special)
 }
 
 /** Trigger-Häufigkeit über alle „Heute nicht“-Tage, absteigend sortiert. */

@@ -25,6 +25,8 @@ create table if not exists public.logs (
   user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
   date date not null,
   on_track boolean not null,
+  -- Special Day: markiert statt bewertet — zählt nicht in Prozent/Momentum
+  special boolean not null default false,
   trigger_tags text[] not null default '{}',
   note text,
   created_at timestamptz not null default now(),

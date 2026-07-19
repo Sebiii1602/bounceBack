@@ -2,23 +2,29 @@ import { eachDayOfInterval, endOfMonth, endOfWeek, isSameMonth, startOfMonth, st
 import { dateKey, todayKey } from '../lib/dates'
 import { WEEKDAYS_DE } from '../lib/metrics'
 
+export interface DayInfo {
+  state: 'on' | 'off' | 'special'
+  hasNote: boolean
+}
+
 /**
  * Monatsraster in gedeckten Farben — Muster sichtbar machen,
  * ohne Ampel-Logik. Tippen öffnet den Tag zum Nachtragen/Ändern.
+ * Tage mit Notiz tragen ein kleines Bookmark in der Ecke.
  */
 export function CalendarGrid({
   month,
-  logsByDate,
+  days,
   onPick,
   allowToday = false,
 }: {
   month: Date
-  logsByDate: Map<string, boolean>
+  days: Map<string, DayInfo>
   onPick: (dateKey: string) => void
   /** Aktiv-Habits dürfen auch heute eintragen, Lass-Habits erst ab morgen */
   allowToday?: boolean
 }) {
-  const days = eachDayOfInterval({
+  const cells = eachDayOfInterval({
     start: startOfWeek(startOfMonth(month), { weekStartsOn: 1 }),
     end: endOfWeek(endOfMonth(month), { weekStartsOn: 1 }),
   })
@@ -31,16 +37,17 @@ export function CalendarGrid({
           {wd}
         </div>
       ))}
-      {days.map((day) => {
+      {cells.map((day) => {
         const key = dateKey(day)
         if (!isSameMonth(day, month)) return <div key={key} />
-        const state = logsByDate.get(key)
+        const info = days.get(key)
         const locked = allowToday ? key > today : key >= today
         const isToday = key === today
 
         let cls: string
-        if (state === true) cls = 'bg-track-soft font-medium text-track-deep'
-        else if (state === false) cls = 'bg-slip-soft font-medium text-slip-deep'
+        if (info?.state === 'on') cls = 'bg-track-soft font-medium text-track-deep'
+        else if (info?.state === 'off') cls = 'bg-slip-soft font-medium text-slip-deep'
+        else if (info?.state === 'special') cls = 'bg-special-soft font-medium text-special-deep'
         else if (locked) cls = 'text-faint/50'
         else cls = 'border border-line/70 text-soft'
 
@@ -50,11 +57,21 @@ export function CalendarGrid({
             type="button"
             disabled={locked}
             onClick={() => onPick(key)}
-            className={`flex aspect-square items-center justify-center rounded-lg text-sm transition active:scale-95 ${cls} ${
+            className={`relative flex aspect-square items-center justify-center rounded-lg text-sm transition active:scale-95 ${cls} ${
               isToday ? 'ring-1 ring-track' : ''
             }`}
           >
             {day.getDate()}
+            {info?.hasNote && (
+              <svg
+                className="absolute right-1 top-1 h-2.5 w-2.5"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                aria-label="Notiz vorhanden"
+              >
+                <path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1Z" />
+              </svg>
+            )}
           </button>
         )
       })}

@@ -12,12 +12,13 @@ import type { LogEntry } from './types'
 
 const TODAY = '2026-07-06' // ein Montag
 
-function mkLog(date: string, onTrack: boolean, tags: string[] = []): LogEntry {
+function mkLog(date: string, onTrack: boolean, tags: string[] = [], special = false): LogEntry {
   return {
     id: `log-${date}`,
     habit_id: 'h1',
     date,
     on_track: onTrack,
+    special,
     trigger_tags: tags,
     note: null,
     created_at: `${date}T12:00:00.000Z`,
@@ -92,6 +93,36 @@ describe('momentum', () => {
       manyGood.push(mkLog(`2026-06-${String(i).padStart(2, '0')}`, true))
     }
     expect(currentMomentum(manyGood, TODAY)).toBe(100)
+  })
+})
+
+describe('special days', () => {
+  it('zählen nicht in den 30-Tage-Prozentwert', () => {
+    const logs = [
+      mkLog('2026-07-04', true),
+      mkLog('2026-07-05', true, [], true), // Special Day — maskiert
+      mkLog('2026-07-06', false),
+    ]
+    // Nur 04. (on) und 06. (nicht) zählen → 50 %
+    expect(currentRollingPct(logs, 30, TODAY)).toBe(50)
+  })
+
+  it('frieren das Momentum ein wie ungeloggte Tage', () => {
+    const logs = [
+      mkLog('2026-07-04', true),
+      mkLog('2026-07-05', false, [], true), // Special mit maskiertem on_track=false
+      mkLog('2026-07-06', true),
+    ]
+    expect(currentMomentum(logs, TODAY)).toBe(50 + 2 + 2)
+  })
+
+  it('tauchen nicht in den Trigger-Mustern auf', () => {
+    const logs = [
+      mkLog('2026-07-01', false, ['Einsam']),
+      mkLog('2026-07-02', false, ['Party'], true), // Special — Tags bleiben, zählen aber nicht
+    ]
+    const stats = tagStats(logs)
+    expect(stats).toEqual([{ label: 'Einsam', count: 1, share: 1 }])
   })
 })
 

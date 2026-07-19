@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, deleteLog, setLogState } from '../lib/db'
+import { db, deleteLog, setLogSpecial, setLogState } from '../lib/db'
 import { copy } from '../lib/copy'
 import { fmtDayLong } from '../lib/dates'
 import type { Habit } from '../lib/types'
@@ -24,7 +24,7 @@ export function DaySheet({
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/25" onClick={onClose}>
       <div
-        className="w-full max-w-md rounded-t-2xl bg-card p-5"
+        className="max-h-[85dvh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-card p-5"
         style={{ paddingBottom: 'calc(1.25rem + env(safe-area-inset-bottom))' }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -37,7 +37,7 @@ export function DaySheet({
           </button>
         </div>
         <LogButtons
-          value={log ? log.on_track : null}
+          value={log && !log.special ? log.on_track : null}
           onSelect={(onTrack) => {
             void setLogState(habit.id, date, onTrack)
             // „On track“ braucht keine Details mehr — Sheet direkt zu.
@@ -45,7 +45,21 @@ export function DaySheet({
             if (onTrack) onClose()
           }}
         />
-        {log && !log.on_track && <LogDetails log={log} onDone={onClose} />}
+        <button
+          type="button"
+          onClick={() => void setLogSpecial(habit.id, date)}
+          className={`mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl border py-3 text-[15px] font-medium transition active:scale-[0.98] ${
+            log?.special
+              ? 'border-special bg-special text-white'
+              : 'border-special/25 bg-special-soft text-special-deep'
+          }`}
+        >
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2L12 2Z" />
+          </svg>
+          {copy.today.specialDay}
+        </button>
+        {log && <LogDetails log={log} onDone={onClose} />}
         {log && (
           <button
             type="button"

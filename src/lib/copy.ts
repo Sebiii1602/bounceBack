@@ -28,6 +28,8 @@ export const copy = {
     notToday: 'Heute nicht',
     notYesterday: 'Gestern nicht',
     notOnTrack: 'Nicht on track',
+    specialDay: 'Special Day',
+    loggedSpecial: (day: string) => `Eingetragen: ${day} — Special Day`,
     targetToday: (day: string) => `Heute — ${day}`,
     targetYesterday: (day: string) => `Gestern — ${day}`,
     logged: (day: string, onTrack: boolean) =>
@@ -62,7 +64,9 @@ export const copy = {
   history: {
     legendOnTrack: 'on track',
     legendNot: 'nicht on track',
+    legendSpecial: 'Special Day',
     legendNone: 'kein Eintrag',
+    legendNote: 'Notiz',
     removeEntry: 'Eintrag entfernen',
   },
 

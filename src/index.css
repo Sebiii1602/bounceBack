@@ -18,6 +18,11 @@
   --color-slip-deep: #8a6844;
   --color-slip-soft: #f6ecdf;
 
+  /* Special Days — staubiges Blau, wertungsfrei */
+  --color-special: #6690b4;
+  --color-special-deep: #446d92;
+  --color-special-soft: #e7eef5;
+
   --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 

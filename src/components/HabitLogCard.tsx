@@ -45,7 +45,11 @@ export function HabitLogCard({ habit }: { habit: Habit }) {
       <div className="mt-3">
         {log && !editing ? (
           <div className="flex items-center justify-between gap-2">
-            <p className="text-sm text-soft">{copy.today.logged(fmtDayShort(log.date), log.on_track)}</p>
+            <p className="text-sm text-soft">
+              {log.special
+                ? copy.today.loggedSpecial(fmtDayShort(log.date))
+                : copy.today.logged(fmtDayShort(log.date), log.on_track)}
+            </p>
             <button
               type="button"
               onClick={() => setEditing(true)}
@@ -56,7 +60,7 @@ export function HabitLogCard({ habit }: { habit: Habit }) {
           </div>
         ) : (
           <LogButtons
-            value={log ? log.on_track : null}
+            value={log && !log.special ? log.on_track : null}
             onSelect={choose}
             negativeLabel={sameDay ? copy.today.notToday : copy.today.notYesterday}
           />

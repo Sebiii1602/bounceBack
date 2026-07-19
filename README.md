@@ -17,6 +17,7 @@
 - Momentum-Score: +2 pro on-track-Tag, −8 pro Ausrutscher, begrenzt auf 0–100, Start bei 50
 - Muster-Ansicht: häufigste Trigger + Wochentagsverteilung der „Heute nicht“-Tage (ab 3 Einträgen)
 - Kalender-Verlauf mit Nachtragen/Ändern beliebiger Tage
+- **Special Days**: Tage blau markieren (Prüfung, Party, besonderer Tag …) mit Notiz und Triggern — wertungsfrei, zählt nicht in die Metriken. Wird der Tag später doch bewertet, wechselt nur die Farbe; Notiz und Trigger bleiben. Tage mit Notiz tragen ein kleines Bookmark im Kalender
 - Local-first: alles liegt in IndexedDB auf dem Gerät, funktioniert komplett offline; mit Supabase-Keys synct es zusätzlich zwischen Geräten
 
 ## Lokal starten (Mac)
