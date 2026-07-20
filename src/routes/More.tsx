@@ -224,7 +224,7 @@ export function More() {
     try {
       await signOut()
     } catch {
-      window.alert(copy.more.signOutOfflineError)
+      window.alert(copy.more.signOutUnsyncedError)
     }
   }
 

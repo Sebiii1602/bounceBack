@@ -90,7 +90,8 @@ export const copy = {
     lastSync: (t: string) => `Zuletzt: ${t}`,
     account: 'Account',
     signOut: 'Abmelden',
-    signOutOfflineError: 'Abmelden geht nur mit Internetverbindung.',
+    signOutUnsyncedError:
+      'Es gibt noch ungesicherte Änderungen — erst synchronisieren, dann klappt das Abmelden (schützt davor, dass Daten verloren gehen).',
     exportCsv: 'CSV-Export',
     exportSoon: 'bald',
   },

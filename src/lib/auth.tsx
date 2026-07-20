@@ -1,8 +1,11 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from './supabase'
-import { onSignedIn } from './sync'
-import { clearLocalData } from './db'
+import { onSignedIn, syncNow } from './sync'
+import { clearLocalData, db } from './db'
+
+/** Abmelden verweigert, solange noch ungesicherte lokale Änderungen offen sind. */
+export class UnsyncedDataError extends Error {}
 
 interface AuthValue {
   /** false = lokaler Modus ohne Supabase-Keys */
@@ -51,6 +54,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signOut(): Promise<void> {
+    // Erst versuchen, alles Ausstehende zu sichern — Abmelden räumt danach
+    // lokal auf, das darf nie Daten mitnehmen, die nirgendwo sonst liegen.
+    await syncNow()
+    if ((await db.outbox.count()) > 0) {
+      throw new UnsyncedDataError()
+    }
     const { error } = await supabase!.auth.signOut()
     if (error) throw error
     // Erst nach bestätigtem Abmelden räumen — sonst würde ein Versuch offline
