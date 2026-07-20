@@ -2,7 +2,8 @@
 export const MOMENTUM = {
   start: 50,
   up: 2,
-  down: -8,
+  /** Abzug nach Stärke des Ausrutschers: 1 = leicht, 2 = mittel (Default), 3 = deutlich */
+  down: { 1: -4, 2: -8, 3: -12 } as Record<1 | 2 | 3, number>,
   min: 0,
   max: 100,
 } as const

@@ -12,13 +12,20 @@ import type { LogEntry } from './types'
 
 const TODAY = '2026-07-06' // ein Montag
 
-function mkLog(date: string, onTrack: boolean, tags: string[] = [], special = false): LogEntry {
+function mkLog(
+  date: string,
+  onTrack: boolean,
+  tags: string[] = [],
+  special = false,
+  severity: LogEntry['severity'] = null,
+): LogEntry {
   return {
     id: `log-${date}`,
     habit_id: 'h1',
     date,
     on_track: onTrack,
     special,
+    severity,
     trigger_tags: tags,
     note: null,
     created_at: `${date}T12:00:00.000Z`,
@@ -79,6 +86,21 @@ describe('momentum', () => {
     const series = momentumSeries(logs, TODAY)
     expect(series).toHaveLength(6)
     expect(series.map((p) => p.value)).toEqual([52, 52, 52, 52, 52, 54])
+  })
+
+  it('gewichtet Ausrutscher nach Stärke: −4 leicht, −8 mittel, −12 deutlich', () => {
+    const logs = [
+      mkLog('2026-07-03', false, [], false, 1),
+      mkLog('2026-07-04', false, [], false, 2),
+      mkLog('2026-07-05', false, [], false, 3),
+      mkLog('2026-07-06', false), // ohne Bewertung = mittel
+    ]
+    expect(currentMomentum(logs, TODAY)).toBe(50 - 4 - 8 - 12 - 8)
+  })
+
+  it('Stärke ändert nichts an der 30-Tage-% — die bleibt binär', () => {
+    const logs = [mkLog('2026-07-05', true), mkLog('2026-07-06', false, [], false, 3)]
+    expect(currentRollingPct(logs, 30, TODAY)).toBe(50)
   })
 
   it('bleibt in den Grenzen 0–100 — nie ein Reset', () => {

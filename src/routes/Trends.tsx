@@ -2,11 +2,12 @@ import { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
 import { copy } from '../lib/copy'
-import { todayKey, yesterdayKey } from '../lib/dates'
+import { shiftKey, todayKey, yesterdayKey } from '../lib/dates'
 import { MIN_RELAPSES_FOR_PATTERNS } from '../lib/config'
 import {
   currentMomentum,
   currentRollingPct,
+  momentumSeries,
   relapseLogs,
   rollingSeries,
   tagStats,
@@ -16,6 +17,7 @@ import type { LogEntry } from '../lib/types'
 import { Card, PageTitle, SectionLabel } from '../components/ui'
 import { HabitSwitcher } from '../components/HabitSwitcher'
 import { TrendChart } from '../components/TrendChart'
+import { MomentumChart } from '../components/MomentumChart'
 
 const SPANS = [30, 60, 90] as const
 
@@ -93,9 +95,14 @@ export function Trends() {
     [selected?.id],
   )
   const [span, setSpan] = useState<(typeof SPANS)[number]>(30)
+  const [momentumInfoOpen, setMomentumInfoOpen] = useState(false)
   // Kurve endet am letzten eintragbaren Tag: heute bei Aktiv-Habits, sonst gestern
   const anchor = selected?.log_same_day ? todayKey() : yesterdayKey()
   const series = useMemo(() => rollingSeries(logs ?? [], span, 30, anchor), [logs, span, anchor])
+  const momentumData = useMemo(() => {
+    const from = shiftKey(anchor, -(span - 1))
+    return momentumSeries(logs ?? [], anchor).filter((p) => p.date >= from)
+  }, [logs, span, anchor])
 
   if (habits === undefined || logs === undefined) return null
 
@@ -140,7 +147,28 @@ export function Trends() {
             </div>
           </Card>
           <Card className="mt-3">
-            <SectionLabel>{copy.trend.momentum}</SectionLabel>
+            <div className="flex items-center justify-between">
+              <SectionLabel>{copy.trend.momentum}</SectionLabel>
+              <button
+                type="button"
+                aria-label={copy.trend.momentumInfoLabel}
+                onClick={() => setMomentumInfoOpen((open) => !open)}
+                className={`-mt-1.5 rounded-full p-1 transition ${
+                  momentumInfoOpen ? 'text-track-deep' : 'text-faint hover:text-ink'
+                }`}
+              >
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M12 11v5" />
+                  <circle cx="12" cy="7.5" r="0.6" fill="currentColor" stroke="none" />
+                </svg>
+              </button>
+            </div>
+            {momentumInfoOpen && (
+              <p className="mb-3 rounded-xl bg-paper px-3.5 py-3 text-sm leading-relaxed text-soft">
+                {copy.trend.momentumInfo}
+              </p>
+            )}
             <div className="flex items-center gap-3">
               <span className="w-12 text-2xl font-semibold">{momentum}</span>
               <div className="h-2 flex-1 rounded-full bg-line/60">
@@ -150,6 +178,11 @@ export function Trends() {
                 />
               </div>
             </div>
+            {momentumData.length > 1 && (
+              <div className="-ml-2 mt-3">
+                <MomentumChart data={momentumData} />
+              </div>
+            )}
             <p className="mt-2 text-xs text-faint">{copy.trend.momentumHint}</p>
           </Card>
           <PatternsCard logs={logs} />

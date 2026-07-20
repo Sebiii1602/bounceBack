@@ -14,7 +14,7 @@
 - Mehrere Habits mit **Eintrag-Modus pro Habit**: Aktiv-Habits (Gym) trägst du am selben Tag ein („Heute nicht“), Lass-Habits (Rauchen) erst am Folgetag („Gestern nicht“) — ein Lass-Tag wird erst bewertet, wenn er vorbei ist
 - Trigger-Tags — Defaults plus eigene, direkt im Log-Flow anlegbar
 - Rolling 30-Tage-% (nicht geloggte Tage zählen nicht gegen dich) + Kurve über 30/60/90 Tage
-- Momentum-Score: +2 pro on-track-Tag, −8 pro Ausrutscher, begrenzt auf 0–100, Start bei 50
+- Momentum-Score: +2 pro on-track-Tag, −4/−8/−12 pro Ausrutscher je nach Stärke (optional bewertbar: Leicht/Mittel/Deutlich — z. B. „wie weit über dem Kalorienbudget?“), begrenzt auf 0–100, Start bei 50. Mit Kurve und In-App-Erklärung (ⓘ) im Trend-Tab
 - Muster-Ansicht: häufigste Trigger + Wochentagsverteilung der „Heute nicht“-Tage (ab 3 Einträgen)
 - Kalender-Verlauf mit Nachtragen/Ändern beliebiger Tage
 - **Special Days**: richtig gute Tage blau hervorheben (mit Notiz und Triggern zum Erinnern) — sie zählen ganz normal als on track, das Blau ist nur die Krone obendrauf. Farbwechsel löscht nie Notizen. Tage mit Notiz tragen ein kleines Bookmark im Kalender
@@ -75,7 +75,7 @@ Dashboard → **Authentication → Sign In / Up → „Confirm email“ ausschal
 
 - **Eintrag-Modus pro Habit:** „Folgetag“ (Standard) für alles, was man lässt — um 14 Uhr weißt du noch nicht, wie der Tag um 23:59 ausgeht, deshalb ist heute gesperrt (auch im Kalender). „Gleicher Tag“ für Aktives wie Gym — einmal hin, Tag geschafft. Umschalten jederzeit unter „Mehr“ am Chip neben dem Habit; ältere Tage lassen sich immer nachtragen.
 - **30-Tage-%:** Anteil „on track“ an den *geloggten* Tagen der letzten 30 Kalendertage. Vergessene Tage zählen nicht in den Nenner — Vergessen wird nicht bestraft. Nachtragen geht jederzeit über den Kalender.
-- **Momentum:** startet bei 50, `+2` pro on-track-Tag, `−8` pro „Heute nicht“, immer zwischen 0 und 100. Nicht geloggte Tage frieren den Wert ein. Konstanten in [`src/lib/config.ts`](src/lib/config.ts).
+- **Momentum:** startet bei 50, `+2` pro on-track-Tag, `−4/−8/−12` pro Ausrutscher je nach Stärke (unbewertet = mittel), immer zwischen 0 und 100. Nicht geloggte Tage frieren den Wert ein. Die Stärke wirkt bewusst **nur** aufs Momentum — die 30-Tage-% bleiben binär (Richtung, nicht Ausmaß). Konstanten in [`src/lib/config.ts`](src/lib/config.ts).
 - **Muster:** erscheinen ab 3 „Heute nicht“-Einträgen — Trigger-Häufigkeit und Wochentagsverteilung.
 
 ## Tech-Stack

@@ -1,7 +1,7 @@
 import Dexie, { type EntityTable } from 'dexie'
 import { DEFAULT_TAGS } from './config'
 import { nowIso } from './dates'
-import type { Habit, LogEntry, MetaRow, OutboxRow, SyncTable, Tag } from './types'
+import type { Habit, LogEntry, MetaRow, OutboxRow, Severity, SyncTable, Tag } from './types'
 
 class BounceBackDB extends Dexie {
   habits!: EntityTable<Habit, 'id'>
@@ -145,6 +145,7 @@ export async function setLogState(habitId: string, date: string, onTrack: boolea
         date,
         on_track: onTrack,
         special: false,
+        severity: null,
         trigger_tags: [],
         note: null,
         created_at: t,
@@ -152,6 +153,14 @@ export async function setLogState(habitId: string, date: string, onTrack: boolea
       })
       await enqueue('logs', 'upsert', id)
     }
+  })
+}
+
+/** Bewertet die Stärke eines „Nicht on track“-Tags (wirkt nur aufs Momentum). */
+export async function setLogSeverity(logId: string, severity: Severity): Promise<void> {
+  await db.transaction('rw', db.logs, db.outbox, async () => {
+    await db.logs.update(logId, { severity, updated_at: nowIso() })
+    await enqueue('logs', 'upsert', logId)
   })
 }
 
@@ -174,6 +183,7 @@ export async function setLogSpecial(habitId: string, date: string): Promise<void
         date,
         on_track: true,
         special: true,
+        severity: null,
         trigger_tags: [],
         note: null,
         created_at: t,

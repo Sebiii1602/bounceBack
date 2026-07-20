@@ -5,6 +5,8 @@ import { WEEKDAYS_DE } from '../lib/metrics'
 export interface DayInfo {
   state: 'on' | 'off' | 'special'
   hasNote: boolean
+  /** Stärke bei „nicht on track“ — färbt den Sand etwas heller/kräftiger */
+  severity?: 1 | 2 | 3
 }
 
 /**
@@ -46,8 +48,11 @@ export function CalendarGrid({
 
         let cls: string
         if (info?.state === 'on') cls = 'bg-track-soft font-medium text-track-deep'
-        else if (info?.state === 'off') cls = 'bg-slip-soft font-medium text-slip-deep'
-        else if (info?.state === 'special') cls = 'bg-special-soft font-medium text-special-deep'
+        else if (info?.state === 'off') {
+          const shade =
+            info.severity === 1 ? 'bg-slip-soft/60' : info.severity === 3 ? 'bg-slip/40' : 'bg-slip-soft'
+          cls = `${shade} font-medium text-slip-deep`
+        } else if (info?.state === 'special') cls = 'bg-special-soft font-medium text-special-deep'
         else if (locked) cls = 'text-faint/50'
         else cls = 'border border-line/70 text-soft'
 

@@ -115,6 +115,7 @@ function normalize(table: SyncTable, raw: RemoteRow): Habit | Tag | LogEntry {
       date: raw.date as string,
       on_track: raw.on_track as boolean,
       special: (raw.special as boolean | null) ?? false,
+      severity: (raw.severity as LogEntry['severity']) ?? null,
       trigger_tags: (raw.trigger_tags as string[] | null) ?? [],
       note: (raw.note as string | null) ?? null,
       created_at: raw.created_at as string,

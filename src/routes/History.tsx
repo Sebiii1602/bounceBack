@@ -42,6 +42,7 @@ export function History() {
       m.set(l.date, {
         state: l.special ? 'special' : l.on_track ? 'on' : 'off',
         hasNote: l.note !== null && l.note !== '',
+        severity: l.severity ?? undefined,
       })
     }
     return m

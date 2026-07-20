@@ -36,6 +36,8 @@ export const copy = {
       `Eingetragen: ${day} — ${onTrack ? 'on track' : 'nicht on track'}`,
     change: 'Ändern',
     triggers: 'Trigger? (optional)',
+    severityTitle: 'Wie stark? (optional)',
+    severity: { 1: 'Leicht', 2: 'Mittel', 3: 'Deutlich' } as Record<1 | 2 | 3, string>,
     newTagPlaceholder: 'Neuer Trigger…',
     addTagChip: '+ Neu',
     notePlaceholder: 'Notiz (optional)',
@@ -53,6 +55,9 @@ export const copy = {
     noData: 'Noch keine Einträge — ab dem ersten Log entsteht hier deine Kurve.',
     momentum: 'Momentum',
     momentumHint: 'Steigt langsam, sinkt bei einem Ausrutscher nur leicht — nie auf null.',
+    momentumInfoLabel: 'Was ist Momentum?',
+    momentumInfo:
+      'Dein Ausdauerbalken. Er startet bei 50 und jeder On-track-Tag (auch Special Days) gibt +2. Ein „Nicht on track“-Tag zieht ab — je nach Stärke −4, −8 oder −12 — aber nie auf null: ein Ausrutscher ist ein Dip, kein Absturz. Tage ohne Eintrag ändern nichts. Kurz: Die 30-Tage-% zeigen deine Richtung, Momentum zeigt, wie viel Puffer du dir aufgebaut hast.',
     days: (n: number) => `${n} Tage`,
     patterns: 'Muster',
     patternsEmpty: 'Noch nicht genug Daten — Muster erscheinen nach ein paar Einträgen.',

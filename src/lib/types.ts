@@ -7,6 +7,9 @@ export interface Habit {
   updated_at: string
 }
 
+/** Stärke eines „Nicht on track“-Tags: 1 = leicht, 2 = mittel, 3 = deutlich */
+export type Severity = 1 | 2 | 3
+
 export interface LogEntry {
   id: string
   habit_id: string
@@ -18,6 +21,12 @@ export interface LogEntry {
    * Zählt ganz normal als on track — `special` ist nur die Krone obendrauf.
    */
   special: boolean
+  /**
+   * Wie stark war der Ausrutscher? Nur relevant, wenn nicht on track;
+   * null = nicht bewertet und zählt wie „mittel“. Wirkt nur aufs Momentum,
+   * nie auf die 30-Tage-% — die bleiben bewusst binär (Richtung, nicht Ausmaß).
+   */
+  severity: Severity | null
   trigger_tags: string[]
   note: string | null
   created_at: string

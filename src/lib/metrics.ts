@@ -1,6 +1,6 @@
 import { MOMENTUM } from './config'
 import { parseKey, shiftKey, todayKey } from './dates'
-import type { LogEntry } from './types'
+import type { LogEntry, Severity } from './types'
 
 export interface TrendPoint {
   date: string
@@ -31,10 +31,16 @@ export const WEEKDAYS_DE = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'] as const
 
 const clamp = (v: number, min: number, max: number): number => Math.min(max, Math.max(min, v))
 
-function logMap(logs: LogEntry[]): Map<string, boolean> {
-  const m = new Map<string, boolean>()
+interface DayValue {
+  on: boolean
+  /** null (nicht bewertet) zählt wie „mittel“ */
+  severity: Severity
+}
+
+function logMap(logs: LogEntry[]): Map<string, DayValue> {
+  const m = new Map<string, DayValue>()
   // Special Days zählen ganz normal (sie sind on track — nur mit Krone)
-  for (const l of logs) m.set(l.date, l.on_track)
+  for (const l of logs) m.set(l.date, { on: l.on_track, severity: l.severity ?? 2 })
   return m
 }
 
@@ -61,14 +67,14 @@ export function rollingSeries(
     const v = map.get(keys[i])
     if (v !== undefined) {
       logged++
-      if (v) onTrack++
+      if (v.on) onTrack++
     }
     const leaving = i - windowDays
     if (leaving >= 0) {
       const w = map.get(keys[leaving])
       if (w !== undefined) {
         logged--
-        if (w) onTrack--
+        if (w.on) onTrack--
       }
     }
     if (i >= total - spanDays) {
@@ -84,7 +90,8 @@ export function currentRollingPct(logs: LogEntry[], windowDays = 30, today = tod
 
 /**
  * Momentum als Ausdauerbalken: Start bei 50, geloggte Tage verschieben ihn
- * asymmetrisch (+2 / −8), begrenzt auf 0–100. Nicht geloggte Tage frieren ein.
+ * asymmetrisch (+2 pro on-track-Tag, −4/−8/−12 je nach Stärke des
+ * Ausrutschers), begrenzt auf 0–100. Nicht geloggte Tage frieren ein.
  */
 export function momentumSeries(logs: LogEntry[], today = todayKey()): MomentumPoint[] {
   if (logs.length === 0) return []
@@ -97,7 +104,7 @@ export function momentumSeries(logs: LogEntry[], today = todayKey()): MomentumPo
   for (let d = first; d <= today; d = shiftKey(d, 1)) {
     const v = map.get(d)
     if (v !== undefined) {
-      value = clamp(value + (v ? MOMENTUM.up : MOMENTUM.down), MOMENTUM.min, MOMENTUM.max)
+      value = clamp(value + (v.on ? MOMENTUM.up : MOMENTUM.down[v.severity]), MOMENTUM.min, MOMENTUM.max)
     }
     out.push({ date: d, value })
   }

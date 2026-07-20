@@ -25,8 +25,10 @@ create table if not exists public.logs (
   user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
   date date not null,
   on_track boolean not null,
-  -- Special Day: markiert statt bewertet — zählt nicht in Prozent/Momentum
+  -- Special Day: Highlight — zählt ganz normal als on track
   special boolean not null default false,
+  -- Stärke eines Ausrutschers (1 leicht / 2 mittel / 3 deutlich), wirkt nur aufs Momentum
+  severity smallint check (severity between 1 and 3),
   trigger_tags text[] not null default '{}',
   note text,
   created_at timestamptz not null default now(),
