@@ -25,3 +25,6 @@ dist-ssr
 
 # PWA dev output
 dev-dist
+
+# Web-Push VAPID Private Key — niemals committen
+supabase/vapid-private-key.txt

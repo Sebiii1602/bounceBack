@@ -22,7 +22,7 @@ export function DaySheet({
   )
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/25" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/30" onClick={onClose}>
       <div
         className="max-h-[85dvh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-card p-5"
         style={{ paddingBottom: 'calc(1.25rem + env(safe-area-inset-bottom))' }}

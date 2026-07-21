@@ -54,6 +54,16 @@ Dashboard → **Authentication → Sign In / Up → „Confirm email“ ausschal
 
 > Hinweis Free Tier: Nach ~1 Woche ohne Nutzung pausiert Supabase das Projekt. Die App läuft dann lokal weiter; im Dashboard „Restore“ klicken und der Sync holt alles nach.
 
+## Erinnerungen einrichten (einmalig, ~10 Minuten)
+
+Die sanfte tägliche Push-Erinnerung („Kurzer Check-in: Wie war gestern?“) braucht drei Dinge in Supabase — App-seitig ist alles schon da (Mehr → Erinnerung):
+
+1. **Tabelle anlegen:** SQL Editor → Teil 1 aus [`supabase/migration-2026-07-22-reminders.sql`](supabase/migration-2026-07-22-reminders.sql) ausführen.
+2. **Edge Function deployen:** Dashboard → **Edge Functions → Deploy a new function** → Name `send-reminders` → Code aus [`supabase/functions/send-reminders/index.ts`](supabase/functions/send-reminders/index.ts) einfügen → **„Verify JWT“ ausschalten** → Deploy. Danach unter **Secrets** drei Werte setzen: `VAPID_PUBLIC_KEY` (steht in `src/lib/config.ts`), `VAPID_PRIVATE_KEY` (liegt lokal in `supabase/vapid-private-key.txt` — nie committen!) und `CRON_SECRET` (beliebige lange Zufallszeichenkette, selbst ausdenken).
+3. **Zeitplan:** SQL Editor → Teil 2 derselben Migrationsdatei, vorher `PROJECT_REF` (aus deiner Projekt-URL) und `DEIN_CRON_SECRET` ersetzen → Run. Ab dann prüft Supabase stündlich, wer gerade dran ist.
+
+**iPhone-Hinweis:** Push funktioniert nur in der **installierten** App (Zum Home-Bildschirm, iOS 16.4+) — im normalen Safari-Tab zeigt die App stattdessen einen Hinweis. Beim Aktivieren fragt iOS einmal nach Erlaubnis.
+
 ## Auf GitHub + Vercel (fürs iPhone)
 
 1. Neues GitHub-Repo `BounceBack` anlegen, dann:
@@ -93,6 +103,5 @@ supabase/     schema.sql zum Einfügen im SQL Editor
 ## Roadmap
 
 - CSV-Export (Platz ist unter „Mehr“ reserviert)
-- Sanfte tägliche Erinnerung (Web Push, iOS 16.4+)
 - Kombinierter Score über mehrere Habits
-- Dark Mode
+- App-Lock (Face ID / PIN)

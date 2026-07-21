@@ -22,7 +22,7 @@ export function MomentumChart({ data }: { data: MomentumPoint[] }) {
             <stop offset="100%" stopColor="var(--color-track)" stopOpacity={0.02} />
           </linearGradient>
         </defs>
-        <CartesianGrid stroke="#f0efee" vertical={false} />
+        <CartesianGrid stroke="var(--color-line)" strokeOpacity={0.6} vertical={false} />
         <XAxis
           dataKey="date"
           tickFormatter={fmtTick}
@@ -46,6 +46,8 @@ export function MomentumChart({ data }: { data: MomentumPoint[] }) {
           contentStyle={{
             borderRadius: 12,
             border: '1px solid var(--color-line)',
+            backgroundColor: 'var(--color-card)',
+            color: 'var(--color-ink)',
             fontSize: 12,
             boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
           }}

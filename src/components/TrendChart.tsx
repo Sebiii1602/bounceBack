@@ -17,7 +17,7 @@ export function TrendChart({ data }: { data: TrendPoint[] }) {
   return (
     <ResponsiveContainer width="100%" height={210}>
       <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
-        <CartesianGrid stroke="#f0efee" vertical={false} />
+        <CartesianGrid stroke="var(--color-line)" strokeOpacity={0.6} vertical={false} />
         <XAxis
           dataKey="date"
           tickFormatter={fmtTick}
@@ -41,6 +41,8 @@ export function TrendChart({ data }: { data: TrendPoint[] }) {
           contentStyle={{
             borderRadius: 12,
             border: '1px solid var(--color-line)',
+            backgroundColor: 'var(--color-card)',
+            color: 'var(--color-ink)',
             fontSize: 12,
             boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
           }}

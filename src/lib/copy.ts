@@ -99,6 +99,20 @@ export const copy = {
       'Es gibt noch ungesicherte Änderungen — erst synchronisieren, dann klappt das Abmelden (schützt davor, dass Daten verloren gehen).',
     exportCsv: 'CSV-Export',
     exportSoon: 'bald',
+    appearance: 'Darstellung',
+    themeSystem: 'System',
+    themeLight: 'Hell',
+    themeDark: 'Dunkel',
+    reminder: 'Erinnerung',
+    reminderHint: 'Eine sanfte Nachricht am Abend — kein Streak-Gemecker, nur ein kurzes „Wie war gestern?“.',
+    reminderUnsupported:
+      'Auf dem iPhone zuerst „Zum Home-Bildschirm hinzufügen“ — Mitteilungen gehen nur in der installierten App (iOS 16.4+).',
+    reminderEnable: 'Aktivieren',
+    reminderDisable: 'Deaktivieren',
+    reminderDenied:
+      'Mitteilungen sind blockiert — in den System-Einstellungen für bounceBack erlauben und nochmal versuchen.',
+    reminderActive: (hour: number) => `Aktiv — täglich gegen ${hour}:00 Uhr`,
+    reminderTime: 'Uhrzeit',
   },
 
   onboarding: {

@@ -26,6 +26,32 @@
   --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
+/*
+ * Dark Mode: dieselben Variablen, dunkel belegt. Die „deep“-Töne dienen
+ * als Textfarben auf den soft-Flächen und müssen im Dunkeln HELL sein.
+ * Gesetzt wird .dark per JS (src/lib/theme.ts): System / Hell / Dunkel.
+ */
+.dark {
+  --color-paper: #131211;
+  --color-card: #1d1b1a;
+  --color-line: #2e2b29;
+  --color-ink: #f0eeec;
+  --color-soft: #a8a29e;
+  --color-faint: #78716c;
+
+  --color-track: #5aa38e;
+  --color-track-deep: #8ec9b6;
+  --color-track-soft: #1d2e29;
+
+  --color-slip: #c29467;
+  --color-slip-deep: #d9b48f;
+  --color-slip-soft: #2e2620;
+
+  --color-special: #6f9abf;
+  --color-special-deep: #a9c6de;
+  --color-special-soft: #1e2733;
+}
+
 html {
   background: var(--color-paper);
 }

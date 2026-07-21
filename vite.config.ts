@@ -11,6 +11,10 @@ export default defineConfig({
       registerType: 'autoUpdate',
       devOptions: { enabled: true },
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
+      workbox: {
+        // Push- und Notification-Click-Handler zusätzlich zum Precache-SW
+        importScripts: ['push-sw.js'],
+      },
       manifest: {
         name: 'bounceBack',
         short_name: 'bounceBack',

@@ -25,4 +25,11 @@ export const DEFAULT_TAGS: readonly string[] = [
   'Sonstiges',
 ]
 
+/**
+ * Web-Push: öffentlicher VAPID-Schlüssel (darf im Code stehen).
+ * Der private Gegenpart liegt NUR als Secret in der Supabase Edge Function.
+ */
+export const VAPID_PUBLIC_KEY =
+  'BFGPFRZbUxTdmpZ5lUZK-x-X8ZzIWnLfmB2nHm0WdIOuyyI9A5tlOH8R0KJrqZ5JBnhAV-POjnIrYJCcuvIPmO4'
+
 export const APP_VERSION = '0.1.0'

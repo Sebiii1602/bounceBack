@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { addHabit, addTag, db, deleteTag, renameHabit, renameTag, setHabitLogMode } from '../lib/db'
 import { copy } from '../lib/copy'
@@ -6,8 +6,136 @@ import { APP_VERSION } from '../lib/config'
 import { fmtTime } from '../lib/dates'
 import { deleteHabitEverywhere, syncNow, useSyncStatus } from '../lib/sync'
 import { useAuth } from '../lib/auth'
+import { getThemePref, setThemePref, type ThemePref } from '../lib/theme'
+import {
+  disableReminder,
+  enableReminder,
+  getReminderHour,
+  pushSupported,
+  updateReminderHour,
+} from '../lib/push'
 import { Card, SectionLabel, PageTitle } from '../components/ui'
 import { LogModeChips } from '../components/LogModeChips'
+
+function AppearanceCard() {
+  const [pref, setPref] = useState<ThemePref>(() => getThemePref())
+  const options: Array<{ value: ThemePref; label: string }> = [
+    { value: 'system', label: copy.more.themeSystem },
+    { value: 'light', label: copy.more.themeLight },
+    { value: 'dark', label: copy.more.themeDark },
+  ]
+  return (
+    <Card className="mt-3">
+      <SectionLabel>{copy.more.appearance}</SectionLabel>
+      <div className="flex gap-2">
+        {options.map((opt) => (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => {
+              setThemePref(opt.value)
+              setPref(opt.value)
+            }}
+            className={`flex-1 rounded-full border px-3 py-1.5 text-sm transition ${
+              pref === opt.value ? 'border-ink bg-ink text-card' : 'border-line bg-card text-soft'
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+    </Card>
+  )
+}
+
+const REMINDER_HOURS = [7, 8, 9, 12, 18, 19, 20, 21, 22]
+
+function ReminderCard() {
+  const { cloud, session } = useAuth()
+  const supported = pushSupported()
+  const [hour, setHour] = useState(20)
+  const [activeHour, setActiveHour] = useState<number | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    if (!supported || !cloud || !session) return
+    void getReminderHour().then((h) => {
+      if (h !== null) {
+        setActiveHour(h)
+        setHour(h)
+      }
+    })
+  }, [supported, cloud, session])
+
+  if (!cloud || !session) return null
+
+  async function toggle() {
+    setBusy(true)
+    try {
+      if (activeHour !== null) {
+        await disableReminder()
+        setActiveHour(null)
+      } else {
+        const result = await enableReminder(hour)
+        if (result === 'denied') window.alert(copy.more.reminderDenied)
+        else setActiveHour(hour)
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function changeHour(next: number) {
+    setHour(next)
+    if (activeHour !== null) {
+      await updateReminderHour(next)
+      setActiveHour(next)
+    }
+  }
+
+  return (
+    <Card className="mt-3">
+      <SectionLabel>{copy.more.reminder}</SectionLabel>
+      {!supported ? (
+        <p className="text-sm text-soft">{copy.more.reminderUnsupported}</p>
+      ) : (
+        <>
+          <div className="flex items-center justify-between gap-2">
+            <label className="flex items-center gap-2 text-sm text-soft">
+              {copy.more.reminderTime}
+              <select
+                value={hour}
+                onChange={(e) => void changeHour(Number(e.target.value))}
+                className="rounded-lg border border-line bg-card px-2 py-1.5 text-ink outline-none"
+              >
+                {REMINDER_HOURS.map((h) => (
+                  <option key={h} value={h}>
+                    {h}:00
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void toggle()}
+              className={`rounded-lg px-3 py-1.5 text-sm font-medium transition disabled:opacity-50 ${
+                activeHour !== null
+                  ? 'border border-line text-soft hover:text-ink'
+                  : 'bg-track text-white'
+              }`}
+            >
+              {activeHour !== null ? copy.more.reminderDisable : copy.more.reminderEnable}
+            </button>
+          </div>
+          <p className="mt-2 text-xs text-faint">
+            {activeHour !== null ? copy.more.reminderActive(activeHour) : copy.more.reminderHint}
+          </p>
+        </>
+      )}
+    </Card>
+  )
+}
 
 function IconButton({ onClick, label, children }: { onClick: () => void; label: string; children: ReactNode }) {
   return (
@@ -268,6 +396,8 @@ export function More() {
           confirmMsg={copy.more.deleteTagConfirm}
         />
       </Card>
+      <AppearanceCard />
+      <ReminderCard />
       <SyncCard />
       {cloud && session && (
         <Card className="mt-3">
