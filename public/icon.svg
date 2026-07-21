@@ -1,5 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" fill="#fafaf9"/>
-  <text x="256" y="238" text-anchor="middle" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="104" font-weight="700" letter-spacing="-3" fill="#1c1917">bounce</text>
-  <text x="256" y="350" text-anchor="middle" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="104" font-weight="700" letter-spacing="-3" fill="#4f9682">Back</text>
+  <rect width="512" height="512" fill="#16211e"/>
+  <!-- Aufsteigende Flugbahn: der Ball kommt aus dem Dip und fliegt wieder hoch -->
+  <g fill="#5fb89d">
+    <circle cx="90" cy="166" r="18" opacity="0.45"/>
+    <circle cx="149" cy="252" r="23" opacity="0.6"/>
+    <circle cx="222" cy="301" r="28" opacity="0.75"/>
+    <circle cx="301" cy="261" r="34" opacity="0.9"/>
+  </g>
+  <circle cx="388" cy="166" r="54" fill="#ffffff"/>
+  <text x="256" y="432" text-anchor="middle" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif"
+        font-size="80" font-weight="700" letter-spacing="-2.5" fill="#ffffff">bounce<tspan fill="#5fb89d">Back</tspan></text>
 </svg>
