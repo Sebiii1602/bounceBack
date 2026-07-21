@@ -54,7 +54,7 @@ export function LogDetails({ log, onDone }: { log: LogEntry; onDone?: () => void
         onBlur={saveNote}
         placeholder={copy.today.notePlaceholder}
         rows={3}
-        className="w-full resize-none rounded-xl border border-line bg-paper px-3.5 py-2.5 text-sm outline-none focus:border-track"
+        className="w-full resize-none rounded-xl border border-line bg-paper px-3.5 py-2.5 text-base outline-none focus:border-track"
       />
       {onDone && (
         <button

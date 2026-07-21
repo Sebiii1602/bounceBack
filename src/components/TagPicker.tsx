@@ -59,7 +59,7 @@ export function TagPicker({
               if (draft.trim() === '') setAdding(false)
             }}
             placeholder={copy.today.newTagPlaceholder}
-            className="w-36 rounded-full border border-line bg-card px-3 py-1.5 text-sm outline-none focus:border-track"
+            className="w-40 rounded-full border border-line bg-card px-3 py-1.5 text-base outline-none focus:border-track"
           />
         </form>
       ) : (

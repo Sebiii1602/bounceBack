@@ -87,7 +87,7 @@ function NameList({
                 autoFocus
                 value={editVal}
                 onChange={(e) => setEditVal(e.target.value)}
-                className="min-w-0 flex-1 rounded-lg border border-line bg-paper px-3 py-1.5 text-sm outline-none focus:border-track"
+                className="min-w-0 flex-1 rounded-lg border border-line bg-paper px-3 py-1.5 text-base outline-none focus:border-track"
               />
               <button type="submit" className="shrink-0 rounded-lg bg-ink px-3 py-1.5 text-sm font-medium text-card">
                 {copy.common.save}
@@ -133,7 +133,7 @@ function NameList({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           placeholder={addPlaceholder}
-          className="min-w-0 flex-1 rounded-lg border border-line bg-paper px-3 py-1.5 text-sm outline-none focus:border-track"
+          className="min-w-0 flex-1 rounded-lg border border-line bg-paper px-3 py-1.5 text-base outline-none focus:border-track"
         />
         <button type="submit" className="shrink-0 rounded-lg bg-track px-3 py-1.5 text-sm font-medium text-white">
           {copy.common.add}

@@ -31,7 +31,7 @@ function EmptyState() {
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder={copy.today.habitNamePlaceholder}
-          className="min-w-0 flex-1 rounded-xl border border-line bg-paper px-3.5 py-2.5 text-sm outline-none focus:border-track"
+          className="min-w-0 flex-1 rounded-xl border border-line bg-paper px-3.5 py-2.5 text-base outline-none focus:border-track"
         />
         <button
           type="submit"

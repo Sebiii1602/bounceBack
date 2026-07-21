@@ -101,6 +101,21 @@ export const copy = {
     exportSoon: 'bald',
   },
 
+  onboarding: {
+    skip: 'Überspringen',
+    next: 'Weiter',
+    start: 'Los geht’s',
+    step1Title: 'Trend statt Streak.',
+    step1Body:
+      'Kein Zähler, der bei einem Ausrutscher auf null springt: Du siehst deine Richtung über die letzten 30 Tage. Ein schlechter Tag ist ein Dip — kein Absturz.',
+    step2Title: 'Bewertet wird der Tag, der vorbei ist.',
+    step2Body:
+      'Beispiel Rauchen: Du trägst heute ein, wie gestern lief — um 14 Uhr weißt du ja noch nicht, wie der Abend wird. Aktives wie Gym trägst du dagegen am selben Tag ein.',
+    step3Title: 'Trigger zeigen dir Muster.',
+    step3Body:
+      'Lief ein Tag nicht, tippst du optional an, was los war — nach ein paar Einträgen zeigt dir die App deine Muster. Richtig gute Tage markierst du blau als Special Day.',
+  },
+
   auth: {
     signIn: 'Anmelden',
     signUp: 'Konto erstellen',

@@ -11,8 +11,9 @@ function mapError(err: unknown): string {
   return copy.auth.errors.generic
 }
 
+// text-base statt text-sm: unter 16px zoomt iOS beim Fokus unschön hinein
 const inputCls =
-  'w-full rounded-xl border border-line bg-card px-3.5 py-2.5 text-sm outline-none focus:border-track'
+  'w-full rounded-xl border border-line bg-card px-3.5 py-2.5 text-base outline-none focus:border-track'
 
 export function AuthScreen() {
   const { signIn, signUp } = useAuth()

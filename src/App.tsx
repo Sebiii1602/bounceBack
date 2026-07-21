@@ -1,10 +1,13 @@
 import { useEffect } from 'react'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { db } from './lib/db'
 import { AuthProvider, useAuth } from './lib/auth'
 import { useSyncStatus, wireSyncEvents } from './lib/sync'
 import { copy } from './lib/copy'
 import { TabBar } from './components/TabBar'
 import { Wordmark } from './components/ui'
+import { Onboarding } from './components/Onboarding'
 import { Today } from './routes/Today'
 import { Trends } from './routes/Trends'
 import { History } from './routes/History'
@@ -51,6 +54,8 @@ function Shell() {
 
 function Gate() {
   const { cloud, session, loading } = useAuth()
+  // undefined = lädt noch, null = noch nie gesehen, Zeile = erledigt
+  const onboardingDone = useLiveQuery(async () => (await db.meta.get('onboarding_done')) ?? null, [])
   useEffect(() => {
     wireSyncEvents()
   }, [])
@@ -58,6 +63,9 @@ function Gate() {
     return <div className="grid min-h-dvh place-items-center text-sm text-soft">{copy.common.loading}</div>
   }
   if (cloud && !session) return <AuthScreen />
+  if (onboardingDone === null) {
+    return <Onboarding onDone={() => void db.meta.put({ key: 'onboarding_done', value: '1' })} />
+  }
   return <Shell />
 }
 

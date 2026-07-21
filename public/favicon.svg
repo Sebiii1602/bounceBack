@@ -1,6 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" fill="#4f9682"/>
-  <path d="M96 150 C 150 300, 176 360, 224 360 C 272 360, 306 246, 396 180"
-        stroke="#ffffff" stroke-width="36" stroke-linecap="round" fill="none" opacity="0.95"/>
-  <circle cx="404" cy="174" r="34" fill="#ffffff"/>
+  <rect width="512" height="512" fill="#fafaf9"/>
+  <text x="256" y="238" text-anchor="middle" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="104" font-weight="700" letter-spacing="-3" fill="#1c1917">bounce</text>
+  <text x="256" y="350" text-anchor="middle" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="104" font-weight="700" letter-spacing="-3" fill="#4f9682">Back</text>
 </svg>

@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:local": "VITE_SUPABASE_URL= VITE_SUPABASE_ANON_KEY= vite --port 5199",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "test": "vitest run",
