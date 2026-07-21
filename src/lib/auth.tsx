@@ -12,9 +12,29 @@ interface AuthValue {
   cloud: boolean
   session: Session | null
   loading: boolean
+  /** true, wenn die App über einen Passwort-Zurücksetzen-Link geöffnet wurde */
+  recovery: boolean
   signIn: (email: string, password: string) => Promise<void>
   signUp: (email: string, password: string) => Promise<'ok' | 'confirm_email'>
   signOut: () => Promise<void>
+  requestPasswordReset: (email: string) => Promise<void>
+  updatePassword: (password: string) => Promise<void>
+}
+
+/**
+ * Bestätigungs- und Reset-Links sollen immer dorthin zurückführen, wo man
+ * gerade ist (Vercel-URL, localhost, …). Ohne diese Angabe nimmt Supabase
+ * die im Dashboard hinterlegte „Site URL“ — und die zeigt im Zweifel noch
+ * auf den Standardwert localhost:3000.
+ */
+const redirectTo = (): string => window.location.origin
+
+/** Recovery-Links kommen je nach Supabase-Flow als #type=recovery oder ?code=… */
+function urlLooksLikeRecovery(): boolean {
+  return (
+    window.location.hash.includes('type=recovery') ||
+    new URLSearchParams(window.location.search).get('type') === 'recovery'
+  )
 }
 
 const AuthContext = createContext<AuthValue | null>(null)
@@ -22,17 +42,20 @@ const AuthContext = createContext<AuthValue | null>(null)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(supabase !== null)
+  const [recovery, setRecovery] = useState(() => supabase !== null && urlLooksLikeRecovery())
 
   useEffect(() => {
     if (!supabase) return
     void supabase.auth.getSession().then(({ data }) => {
       setSession(data.session)
       setLoading(false)
-      if (data.session) void onSignedIn(data.session)
+      // Beim Zurücksetzen zuerst das neue Passwort setzen lassen, nicht direkt rein
+      if (data.session && !urlLooksLikeRecovery()) void onSignedIn(data.session)
     })
     const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
       setSession(s)
-      if (event === 'SIGNED_IN' && s) void onSignedIn(s)
+      if (event === 'PASSWORD_RECOVERY') setRecovery(true)
+      if (event === 'SIGNED_IN' && s && !urlLooksLikeRecovery()) void onSignedIn(s)
     })
     return () => sub.subscription.unsubscribe()
   }, [])
@@ -48,9 +71,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * eine Bestätigungs-Mail im Postfach.
    */
   async function signUp(email: string, password: string): Promise<'ok' | 'confirm_email'> {
-    const { data, error } = await supabase!.auth.signUp({ email, password })
+    const { data, error } = await supabase!.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo: redirectTo() },
+    })
     if (error) throw error
     return data.session ? 'ok' : 'confirm_email'
+  }
+
+  async function requestPasswordReset(email: string): Promise<void> {
+    const { error } = await supabase!.auth.resetPasswordForEmail(email, {
+      redirectTo: redirectTo(),
+    })
+    if (error) throw error
+  }
+
+  async function updatePassword(password: string): Promise<void> {
+    const { data, error } = await supabase!.auth.updateUser({ password })
+    if (error) throw error
+    setRecovery(false)
+    // URL-Fragment mit den Recovery-Tokens entfernen, damit ein Reload nicht
+    // wieder im Zurücksetzen-Modus landet
+    window.history.replaceState(null, '', window.location.pathname)
+    const { data: current } = await supabase!.auth.getSession()
+    if (current.session) void onSignedIn(current.session)
+    else if (data.user) setSession(null)
   }
 
   async function signOut(): Promise<void> {
@@ -68,7 +114,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ cloud: supabase !== null, session, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider
+      value={{
+        cloud: supabase !== null,
+        session,
+        loading,
+        recovery,
+        signIn,
+        signUp,
+        signOut,
+        requestPasswordReset,
+        updatePassword,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   )

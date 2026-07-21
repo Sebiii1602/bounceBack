@@ -141,6 +141,16 @@ export const copy = {
     confirmSentBody: (email: string) =>
       `Wir haben eine Mail an ${email} geschickt — auch im Spam-Ordner nachsehen. Nach dem Bestätigen hier anmelden.`,
     backToSignIn: 'Zur Anmeldung',
+    forgotLink: 'Passwort vergessen?',
+    forgotTitle: 'Passwort zurücksetzen',
+    forgotBody: 'Wir schicken dir einen Link, mit dem du ein neues Passwort setzen kannst.',
+    forgotSubmit: 'Link schicken',
+    forgotSentTitle: 'Link ist unterwegs',
+    forgotSentBody: (email: string) =>
+      `Falls es ein Konto zu ${email} gibt, liegt gleich eine Mail im Postfach — auch im Spam nachsehen.`,
+    newPasswordTitle: 'Neues Passwort setzen',
+    newPasswordPlaceholder: 'Neues Passwort (mind. 6 Zeichen)',
+    newPasswordSubmit: 'Passwort speichern',
     errors: {
       invalid: 'E-Mail oder Passwort falsch',
       notConfirmed: 'E-Mail noch nicht bestätigt — sieh in dein Postfach (auch Spam)',

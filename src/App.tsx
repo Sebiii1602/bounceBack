@@ -13,6 +13,7 @@ import { Trends } from './routes/Trends'
 import { History } from './routes/History'
 import { More } from './routes/More'
 import { AuthScreen } from './routes/AuthScreen'
+import { NewPasswordScreen } from './routes/NewPasswordScreen'
 
 function SyncDot() {
   const { state } = useSyncStatus()
@@ -53,7 +54,7 @@ function Shell() {
 }
 
 function Gate() {
-  const { cloud, session, loading } = useAuth()
+  const { cloud, session, loading, recovery } = useAuth()
   // undefined = lädt noch, null = noch nie gesehen, Zeile = erledigt
   const onboardingDone = useLiveQuery(async () => (await db.meta.get('onboarding_done')) ?? null, [])
   useEffect(() => {
@@ -62,6 +63,8 @@ function Gate() {
   if (cloud && loading) {
     return <div className="grid min-h-dvh place-items-center text-sm text-soft">{copy.common.loading}</div>
   }
+  // Reset-Link geöffnet: erst neues Passwort setzen, dann normal weiter
+  if (cloud && recovery) return <NewPasswordScreen />
   if (cloud && !session) return <AuthScreen />
   if (onboardingDone === null) {
     return <Onboarding onDone={() => void db.meta.put({ key: 'onboarding_done', value: '1' })} />

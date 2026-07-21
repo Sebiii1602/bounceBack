@@ -73,7 +73,11 @@ Die sanfte tägliche Push-Erinnerung („Kurzer Check-in: Wie war gestern?“) b
    ```
 2. Auf [vercel.com](https://vercel.com) mit GitHub anmelden → **Add New → Project** → `BounceBack` importieren. Framework „Vite“ wird automatisch erkannt.
 3. Bei **Environment Variables** die beiden Werte aus `.env.local` eintragen (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`) → **Deploy**.
-4. In Supabase die **Site URL** auf die Vercel-URL ändern (z. B. `https://bounceback.vercel.app`).
+4. ⚠️ **Wichtig, sonst laufen alle Bestätigungs- und Reset-Mails ins Leere:** In Supabase unter **Authentication → URL Configuration**
+   - **Site URL** auf die Vercel-URL setzen (z. B. `https://bounceback.vercel.app`),
+   - unter **Redirect URLs** zusätzlich `http://localhost:5173/**` eintragen, damit lokales Entwickeln weiter funktioniert.
+
+   Steht dort noch der Standardwert `http://localhost:3000`, zeigen die Links in den E-Mails dorthin — auf dem Handy erscheint dann „This site can't be reached“.
 
 ## Aufs iPhone (PWA installieren)
 

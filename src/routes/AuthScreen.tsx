@@ -15,9 +15,11 @@ function mapError(err: unknown): string {
 const inputCls =
   'w-full rounded-xl border border-line bg-card px-3.5 py-2.5 text-base outline-none focus:border-track'
 
+type Mode = 'in' | 'up' | 'sent' | 'forgot' | 'forgot_sent'
+
 export function AuthScreen() {
-  const { signIn, signUp } = useAuth()
-  const [mode, setMode] = useState<'in' | 'up' | 'sent'>('in')
+  const { signIn, signUp, requestPasswordReset } = useAuth()
+  const [mode, setMode] = useState<Mode>('in')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -28,7 +30,10 @@ export function AuthScreen() {
     setBusy(true)
     setError(null)
     try {
-      if (mode === 'in') {
+      if (mode === 'forgot') {
+        await requestPasswordReset(email)
+        setMode('forgot_sent')
+      } else if (mode === 'in') {
         await signIn(email, password)
       } else {
         const result = await signUp(email, password)
@@ -41,6 +46,13 @@ export function AuthScreen() {
     }
   }
 
+  const notice =
+    mode === 'sent'
+      ? { title: copy.auth.confirmSentTitle, body: copy.auth.confirmSentBody(email) }
+      : mode === 'forgot_sent'
+        ? { title: copy.auth.forgotSentTitle, body: copy.auth.forgotSentBody(email) }
+        : null
+
   return (
     <div className="flex min-h-dvh items-center justify-center px-6">
       <div className="w-full max-w-sm">
@@ -48,10 +60,10 @@ export function AuthScreen() {
           <Wordmark className="text-3xl" />
           <p className="mt-2 text-sm text-soft">{copy.tagline}</p>
         </div>
-        {mode === 'sent' ? (
+        {notice ? (
           <div className="space-y-4 text-center">
-            <h2 className="text-base font-semibold">{copy.auth.confirmSentTitle}</h2>
-            <p className="text-sm text-soft">{copy.auth.confirmSentBody(email)}</p>
+            <h2 className="text-base font-semibold">{notice.title}</h2>
+            <p className="text-sm text-soft">{notice.body}</p>
             <button
               type="button"
               onClick={() => setMode('in')}
@@ -62,6 +74,12 @@ export function AuthScreen() {
           </div>
         ) : (
           <form onSubmit={submit} className="space-y-3">
+            {mode === 'forgot' && (
+              <div className="pb-1 text-center">
+                <h2 className="text-base font-semibold">{copy.auth.forgotTitle}</h2>
+                <p className="mt-1 text-sm text-soft">{copy.auth.forgotBody}</p>
+              </div>
+            )}
             <input
               type="email"
               required
@@ -71,34 +89,56 @@ export function AuthScreen() {
               placeholder={copy.auth.email}
               className={inputCls}
             />
-            <input
-              type="password"
-              required
-              minLength={6}
-              autoComplete={mode === 'in' ? 'current-password' : 'new-password'}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder={copy.auth.password}
-              className={inputCls}
-            />
+            {mode !== 'forgot' && (
+              <input
+                type="password"
+                required
+                minLength={6}
+                autoComplete={mode === 'in' ? 'current-password' : 'new-password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={copy.auth.password}
+                className={inputCls}
+              />
+            )}
             {error && <p className="text-sm text-slip-deep">{error}</p>}
             <button
               type="submit"
               disabled={busy}
               className="w-full rounded-xl bg-ink py-2.5 font-medium text-card transition disabled:opacity-50"
             >
-              {mode === 'in' ? copy.auth.signIn : copy.auth.signUp}
+              {mode === 'forgot'
+                ? copy.auth.forgotSubmit
+                : mode === 'in'
+                  ? copy.auth.signIn
+                  : copy.auth.signUp}
             </button>
             <button
               type="button"
               onClick={() => {
-                setMode(mode === 'in' ? 'up' : 'in')
+                setMode(mode === 'forgot' ? 'in' : mode === 'in' ? 'up' : 'in')
                 setError(null)
               }}
               className="w-full text-center text-sm font-medium text-track-deep"
             >
-              {mode === 'in' ? copy.auth.switchToSignUp : copy.auth.switchToSignIn}
+              {mode === 'forgot'
+                ? copy.auth.backToSignIn
+                : mode === 'in'
+                  ? copy.auth.switchToSignUp
+                  : copy.auth.switchToSignIn}
             </button>
+            {mode === 'in' && (
+              <button
+                type="button"
+                onClick={() => {
+                  setMode('forgot')
+                  setError(null)
+                }}
+                className="w-full text-center text-sm text-faint"
+              >
+                {copy.auth.forgotLink}
+              </button>
+            )}
           </form>
         )}
       </div>
