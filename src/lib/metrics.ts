@@ -37,10 +37,20 @@ interface DayValue {
   severity: Severity
 }
 
+/**
+ * Nur bewertete Tage zählen. Reine Notiz-Einträge (Urge am laufenden Tag)
+ * halten Text und Trigger fest, haben aber noch kein Urteil — sie dürfen
+ * weder als Ausrutscher noch als on-track-Tag durchgehen.
+ */
+export const isRated = (l: LogEntry): boolean => l.rated !== false
+
 function logMap(logs: LogEntry[]): Map<string, DayValue> {
   const m = new Map<string, DayValue>()
   // Special Days zählen ganz normal (sie sind on track — nur mit Krone)
-  for (const l of logs) m.set(l.date, { on: l.on_track, severity: l.severity ?? 2 })
+  for (const l of logs) {
+    if (!isRated(l)) continue
+    m.set(l.date, { on: l.on_track, severity: l.severity ?? 2 })
+  }
   return m
 }
 
@@ -94,10 +104,9 @@ export function currentRollingPct(logs: LogEntry[], windowDays = 30, today = tod
  * Ausrutschers), begrenzt auf 0–100. Nicht geloggte Tage frieren ein.
  */
 export function momentumSeries(logs: LogEntry[], today = todayKey()): MomentumPoint[] {
-  if (logs.length === 0) return []
   const map = logMap(logs)
-  let first = logs[0]!.date
-  for (const l of logs) if (l.date < first) first = l.date
+  if (map.size === 0) return []
+  const first = [...map.keys()].sort()[0]!
 
   const out: MomentumPoint[] = []
   let value: number = MOMENTUM.start
@@ -117,7 +126,7 @@ export function currentMomentum(logs: LogEntry[], today = todayKey()): number {
 }
 
 export function relapseLogs(logs: LogEntry[]): LogEntry[] {
-  return logs.filter((l) => !l.on_track)
+  return logs.filter((l) => isRated(l) && !l.on_track)
 }
 
 /** Trigger-Häufigkeit über alle „Heute nicht“-Tage, absteigend sortiert. */

@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { addHabit, addTag, db, deleteTag, renameHabit, renameTag, setHabitLogMode } from '../lib/db'
+import { addHabit, addTag, db, deleteTag, renameHabit, renameTag, setHabitLogMode, sortTags } from '../lib/db'
 import { copy } from '../lib/copy'
 import { APP_VERSION } from '../lib/config'
 import { fmtTime } from '../lib/dates'
@@ -334,7 +334,7 @@ export function More() {
     [],
   )
   const tags = useLiveQuery(
-    async () => (await db.tags.toArray()).sort((a, b) => a.created_at.localeCompare(b.created_at)),
+    async () => sortTags(await db.tags.toArray()),
     [],
   )
   const { cloud, session, signOut } = useAuth()

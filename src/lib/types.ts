@@ -15,6 +15,12 @@ export interface LogEntry {
   habit_id: string
   /** Lokales Kalenderdatum als 'yyyy-MM-dd' */
   date: string
+  /**
+   * false = nur notiert, noch nicht bewertet (Urge/Tagebuch am laufenden Tag).
+   * Solche Einträge zählen nirgends mit — sie halten nur Notiz und Trigger fest,
+   * bis der Tag vorbei ist und bewertet wird. `on_track` ist dann bedeutungslos.
+   */
+  rated: boolean
   on_track: boolean
   /**
    * Special Day: Highlight-Markierung (blau) für richtig gute Tage.

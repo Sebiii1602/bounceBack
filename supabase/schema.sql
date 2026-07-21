@@ -24,6 +24,8 @@ create table if not exists public.logs (
   habit_id uuid not null references public.habits (id) on delete cascade,
   user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
   date date not null,
+  -- false = nur notiert (Urge am laufenden Tag), noch ohne Bewertung
+  rated boolean not null default true,
   on_track boolean not null,
   -- Special Day: Highlight — zählt ganz normal als on track
   special boolean not null default false,

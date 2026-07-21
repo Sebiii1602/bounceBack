@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { addTag, db } from '../lib/db'
+import { addTag, db, sortTags } from '../lib/db'
 import { copy } from '../lib/copy'
 
 /** Trigger-Chips: 1 Tap zum Togglen, „+“ legt inline einen eigenen Tag an. */
@@ -11,11 +11,7 @@ export function TagPicker({
   selected: string[]
   onToggle: (label: string) => void
 }) {
-  const tags =
-    useLiveQuery(
-      async () => (await db.tags.toArray()).sort((a, b) => a.created_at.localeCompare(b.created_at)),
-      [],
-    ) ?? []
+  const tags = useLiveQuery(async () => sortTags(await db.tags.toArray()), []) ?? []
   const [adding, setAdding] = useState(false)
   const [draft, setDraft] = useState('')
 

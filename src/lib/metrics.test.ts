@@ -23,6 +23,7 @@ function mkLog(
     id: `log-${date}`,
     habit_id: 'h1',
     date,
+    rated: true,
     on_track: onTrack,
     special,
     severity,
@@ -164,5 +165,42 @@ describe('patterns', () => {
     expect(stats[6]).toEqual({ weekday: 6, label: 'So', count: 2 })
     expect(stats[0]).toEqual({ weekday: 0, label: 'Mo', count: 1 })
     expect(stats.reduce((s, w) => s + w.count, 0)).toBe(3)
+  })
+})
+
+/** Nur notiert, noch nicht bewertet — hält Notiz/Trigger fest, zählt aber nirgends mit. */
+function mkUnrated(date: string, tags: string[] = []): LogEntry {
+  return { ...mkLog(date, false, tags), rated: false }
+}
+
+describe('unbewertete Notiz-Einträge', () => {
+  it('zählen nicht in die 30-Tage-%', () => {
+    const rated = [mkLog('2026-07-04', true), mkLog('2026-07-05', true)]
+    expect(currentRollingPct(rated, 30, TODAY)).toBe(100)
+    // Die Notiz zum laufenden Tag darf die Quote nicht auf 67 % drücken
+    expect(currentRollingPct([...rated, mkUnrated(TODAY, ['Gestresst'])], 30, TODAY)).toBe(100)
+  })
+
+  it('lassen das Momentum unverändert', () => {
+    const rated = [mkLog('2026-07-05', true)]
+    const before = currentMomentum(rated, TODAY)
+    expect(currentMomentum([...rated, mkUnrated(TODAY)], TODAY)).toBe(before)
+  })
+
+  it('starten die Momentum-Kurve nicht früher', () => {
+    const logs = [mkUnrated('2026-06-01'), mkLog('2026-07-05', true)]
+    expect(momentumSeries(logs, TODAY)[0]!.date).toBe('2026-07-05')
+  })
+
+  it('tauchen nicht in den Trigger-Mustern auf', () => {
+    const logs = [mkLog('2026-07-04', false, ['Einsam']), mkUnrated('2026-07-05', ['Alkohol'])]
+    expect(tagStats(logs)).toEqual([{ label: 'Einsam', count: 1, share: 1 }])
+    expect(weekdayStats(logs).reduce((s, w) => s + w.count, 0)).toBe(1)
+  })
+
+  it('werden beim Bewerten zum normalen Eintrag (Notiz bleibt)', () => {
+    const journal = mkUnrated('2026-07-05', ['Gestresst'])
+    const nachBewertung: LogEntry = { ...journal, rated: true, on_track: false }
+    expect(tagStats([nachBewertung])).toEqual([{ label: 'Gestresst', count: 1, share: 1 }])
   })
 })

@@ -42,6 +42,15 @@ export const copy = {
     addTagChip: '+ Neu',
     notePlaceholder: 'Notiz (optional)',
     done: 'Fertig',
+    tabRate: 'Gestern bewerten',
+    tabJournal: 'Heute notieren',
+    journalTitle: (day: string) => `Heute — ${day}`,
+    journalHint:
+      'Bewertet wird dieser Tag erst morgen. Was du jetzt festhältst, ist dann schon da.',
+    journalTriggers: 'Was ist gerade los?',
+    journalNotePlaceholder: 'Was du gerade denkst, fühlst, tust…',
+    journalSaved: 'Gespeichert',
+    carriedNote: (text: string) => `Damals notiert: „${text}“`,
     emptyTitle: 'Leg deinen ersten Habit an',
     emptyHint: 'Das, worum es gerade geht. Weitere kannst du später unter „Mehr“ hinzufügen.',
     modeHint: 'Aktives (Gym) trägst du am selben Tag ein — Lassen (z. B. Rauchen) erst am Folgetag, wenn der Tag rum ist.',
@@ -72,7 +81,9 @@ export const copy = {
     legendSpecial: 'Special Day',
     legendNone: 'kein Eintrag',
     legendNote: 'Notiz',
+    legendOpen: 'nur notiert',
     removeEntry: 'Eintrag entfernen',
+    notRateableYet: 'Dieser Tag ist noch nicht vorbei — bewerten kannst du ihn morgen.',
   },
 
   more: {

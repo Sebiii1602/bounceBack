@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie'
-import { DEFAULT_TAGS } from './config'
+import { DEFAULT_TAGS, RETIRED_DEFAULT_TAGS } from './config'
 import { nowIso } from './dates'
 import type { Habit, LogEntry, MetaRow, OutboxRow, Severity, SyncTable, Tag } from './types'
 
@@ -45,6 +45,19 @@ function buildDefaultTagRows(): Tag[] {
   return DEFAULT_TAGS.map((label) => ({ id: crypto.randomUUID(), label, created_at: t, updated_at: t }))
 }
 
+/**
+ * Anzeige-Reihenfolge der Trigger: Start-Trigger in der Reihenfolge aus
+ * config.ts, eigene danach nach Anlagedatum. Ohne das stehen die Chips zufällig
+ * durcheinander — alle Start-Trigger tragen denselben Zeitstempel.
+ */
+export function sortTags(tags: Tag[]): Tag[] {
+  const rank = (t: Tag): number => {
+    const i = DEFAULT_TAGS.indexOf(t.label)
+    return i === -1 ? DEFAULT_TAGS.length : i
+  }
+  return [...tags].sort((a, b) => rank(a) - rank(b) || a.created_at.localeCompare(b.created_at))
+}
+
 /** Sät die Start-Trigger neu — z. B. nachdem `clearLocalData()` das Gerät geleert hat. */
 export async function seedDefaultTags(): Promise<void> {
   await db.tags.bulkAdd(buildDefaultTagRows())
@@ -67,6 +80,45 @@ db.version(3)
         if (l.special === undefined) l.special = false
       }),
   )
+
+// v4: logs.rated (Notiz vor der Bewertung) + aufgefrischte Start-Trigger
+db.version(4)
+  .stores({
+    habits: 'id, updated_at',
+    logs: 'id, [habit_id+date], habit_id, updated_at',
+    tags: 'id, label, updated_at',
+    outbox: '++seq, row_id',
+    meta: 'key',
+  })
+  .upgrade(async (tx) => {
+    // Alles, was es bisher gibt, ist bewertet
+    await tx
+      .table('logs')
+      .toCollection()
+      .modify((l) => {
+        if (l.rated === undefined) l.rated = true
+      })
+
+    const t = nowIso()
+    const tags = (await tx.table('tags').toArray()) as Tag[]
+    const known = new Set(tags.map((x) => x.label))
+    for (const label of DEFAULT_TAGS) {
+      if (known.has(label)) continue
+      const id = crypto.randomUUID()
+      await tx.table('tags').add({ id, label, created_at: t, updated_at: t })
+      await tx.table('outbox').add({ table: 'tags', op: 'upsert', row_id: id })
+    }
+
+    // Zu spezielle Start-Trigger wieder abräumen — aber nur, wenn sie in
+    // keinem Eintrag stecken: was jemand benutzt hat, bleibt seins.
+    const logs = (await tx.table('logs').toArray()) as LogEntry[]
+    const inUse = new Set(logs.flatMap((l) => l.trigger_tags))
+    for (const tag of tags) {
+      if (!RETIRED_DEFAULT_TAGS.includes(tag.label) || inUse.has(tag.label)) continue
+      await tx.table('tags').delete(tag.id)
+      await tx.table('outbox').add({ table: 'tags', op: 'delete', row_id: tag.id })
+    }
+  })
 
 db.on('populate', (tx) => {
   void tx.table('tags').bulkAdd(buildDefaultTagRows())
@@ -135,7 +187,9 @@ export async function setLogState(habitId: string, date: string, onTrack: boolea
     const existing = await db.logs.where('[habit_id+date]').equals([habitId, date]).first()
     const t = nowIso()
     if (existing) {
-      await db.logs.update(existing.id, { on_track: onTrack, special: false, updated_at: t })
+      // Ein vorher nur notierter Tag (Urge) wird hier zum bewerteten Tag —
+      // Notiz und Trigger von damals bleiben dabei erhalten.
+      await db.logs.update(existing.id, { rated: true, on_track: onTrack, special: false, updated_at: t })
       await enqueue('logs', 'upsert', existing.id)
     } else {
       const id = crypto.randomUUID()
@@ -143,6 +197,7 @@ export async function setLogState(habitId: string, date: string, onTrack: boolea
         id,
         habit_id: habitId,
         date,
+        rated: true,
         on_track: onTrack,
         special: false,
         severity: null,
@@ -173,7 +228,7 @@ export async function setLogSpecial(habitId: string, date: string): Promise<void
     const existing = await db.logs.where('[habit_id+date]').equals([habitId, date]).first()
     const t = nowIso()
     if (existing) {
-      await db.logs.update(existing.id, { on_track: true, special: true, updated_at: t })
+      await db.logs.update(existing.id, { rated: true, on_track: true, special: true, updated_at: t })
       await enqueue('logs', 'upsert', existing.id)
     } else {
       const id = crypto.randomUUID()
@@ -181,6 +236,7 @@ export async function setLogSpecial(habitId: string, date: string): Promise<void
         id,
         habit_id: habitId,
         date,
+        rated: true,
         on_track: true,
         special: true,
         severity: null,
@@ -191,6 +247,50 @@ export async function setLogSpecial(habitId: string, date: string): Promise<void
       })
       await enqueue('logs', 'upsert', id)
     }
+  })
+}
+
+/**
+ * Gibt den Eintrag für (Habit, Tag) zurück und legt ihn bei Bedarf **unbewertet**
+ * an: für Notizen und Trigger am laufenden Tag („gerade Druck“), lange bevor
+ * feststeht, wie der Tag ausgeht. Zählt in keiner Metrik mit — sobald der Tag
+ * vorbei ist und bewertet wird, ist alles Notierte schon da.
+ */
+export async function ensureLogRow(habitId: string, date: string): Promise<string> {
+  return db.transaction('rw', db.logs, db.outbox, async () => {
+    const existing = await db.logs.where('[habit_id+date]').equals([habitId, date]).first()
+    if (existing) return existing.id
+    const id = crypto.randomUUID()
+    const t = nowIso()
+    await db.logs.add({
+      id,
+      habit_id: habitId,
+      date,
+      rated: false,
+      on_track: false,
+      special: false,
+      severity: null,
+      trigger_tags: [],
+      note: null,
+      created_at: t,
+      updated_at: t,
+    })
+    await enqueue('logs', 'upsert', id)
+    return id
+  })
+}
+
+/**
+ * Räumt einen nur notierten Tag wieder weg, sobald nichts mehr drinsteht —
+ * ein leerer Platzhalter soll nicht als Notiz-Bookmark im Kalender stehen.
+ */
+export async function dropEmptyUnratedLog(logId: string): Promise<void> {
+  await db.transaction('rw', db.logs, db.outbox, async () => {
+    const log = await db.logs.get(logId)
+    if (!log || log.rated) return
+    if (log.trigger_tags.length > 0 || (log.note ?? '') !== '') return
+    await db.logs.delete(logId)
+    await enqueue('logs', 'delete', logId)
   })
 }
 

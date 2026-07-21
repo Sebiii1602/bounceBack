@@ -1,24 +1,16 @@
-import { useEffect, useState } from 'react'
 import { setLogNote, setLogSeverity, toggleLogTag } from '../lib/db'
 import { copy } from '../lib/copy'
+import { useAutosavedNote } from '../lib/useAutosavedNote'
 import type { LogEntry, Severity } from '../lib/types'
 import { SectionLabel } from './ui'
+import { AutoTextarea } from './AutoTextarea'
 import { TagPicker } from './TagPicker'
 
 const SEVERITIES: readonly Severity[] = [1, 2, 3]
 
 /** Optionaler Teil des Log-Flows: Trigger-Chips + Notiz — jederzeit überspringbar. */
 export function LogDetails({ log, onDone }: { log: LogEntry; onDone?: () => void }) {
-  const [note, setNote] = useState(log.note ?? '')
-
-  useEffect(() => {
-    setNote(log.note ?? '')
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [log.id])
-
-  function saveNote() {
-    if ((log.note ?? '') !== note) void setLogNote(log.id, note)
-  }
+  const note = useAutosavedNote(log.note ?? '', true, log.id, (text) => setLogNote(log.id, text))
 
   return (
     <div className="mt-3 space-y-3 border-t border-line pt-3">
@@ -48,19 +40,17 @@ export function LogDetails({ log, onDone }: { log: LogEntry; onDone?: () => void
         <SectionLabel>{copy.today.triggers}</SectionLabel>
         <TagPicker selected={log.trigger_tags} onToggle={(label) => void toggleLogTag(log.id, label)} />
       </div>
-      <textarea
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
-        onBlur={saveNote}
+      <AutoTextarea
+        value={note.value}
+        onChange={(e) => note.setValue(e.target.value)}
+        onBlur={note.flush}
         placeholder={copy.today.notePlaceholder}
-        rows={3}
-        className="w-full resize-none rounded-xl border border-line bg-paper px-3.5 py-2.5 text-base outline-none focus:border-track"
       />
       {onDone && (
         <button
           type="button"
           onClick={() => {
-            saveNote()
+            note.flush()
             onDone()
           }}
           className="w-full rounded-xl bg-ink py-2.5 text-sm font-medium text-card"

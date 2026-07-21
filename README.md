@@ -12,6 +12,7 @@
 ## Features
 
 - Mehrere Habits mit **Eintrag-Modus pro Habit**: Aktiv-Habits (Gym) trägst du am selben Tag ein („Heute nicht“), Lass-Habits (Rauchen) erst am Folgetag („Gestern nicht“) — ein Lass-Tag wird erst bewertet, wenn er vorbei ist
+- **Notieren, während der Tag noch läuft**: Bei Folgetag-Habits gibt es neben „Gestern bewerten“ den Tab „Heute notieren“ — für den Moment, in dem der Druck da ist. Trigger und Notiz landen am heutigen Tag, ohne ihn zu bewerten; morgen steht beides schon da, wenn der Tag drankommt. So wird der Tracker nebenbei zum Tagebuch
 - Trigger-Tags — Defaults plus eigene, direkt im Log-Flow anlegbar
 - Rolling 30-Tage-% (nicht geloggte Tage zählen nicht gegen dich) + Kurve über 30/60/90 Tage
 - Momentum-Score: +2 pro on-track-Tag, −4/−8/−12 pro Ausrutscher je nach Stärke (optional bewertbar: Leicht/Mittel/Deutlich — z. B. „wie weit über dem Kalorienbudget?“), begrenzt auf 0–100, Start bei 50. Mit Kurve und In-App-Erklärung (ⓘ) im Trend-Tab
@@ -37,7 +38,9 @@ Damit Mac und iPhone dieselben Daten sehen (und du ein Backup hast):
 
 1. Auf [supabase.com](https://supabase.com) registrieren (Login mit GitHub geht am schnellsten).
 2. **New project** → Name z. B. `bounceback`, Datenbank-Passwort generieren lassen (musst du dir nicht merken), Region **Frankfurt (eu-central-1)** → warten bis das Projekt bereit ist.
-3. Links **SQL Editor** öffnen → kompletten Inhalt von [`supabase/schema.sql`](supabase/schema.sql) einfügen → **Run**. („Success. No rows returned“ ist das erwartete Ergebnis.) *Schema schon vor dem 08.07.2026 eingespielt? Dann einmal [`supabase/migration-2026-07-08-log-mode.sql`](supabase/migration-2026-07-08-log-mode.sql) ausführen. Schema schon vor dem 14.07.2026 eingespielt? Zusätzlich [`supabase/migration-2026-07-14-tags-per-account.sql`](supabase/migration-2026-07-14-tags-per-account.sql) (Kommentar darin vorher beachten — Pre-Flight-Check auf Duplikate).*
+3. Links **SQL Editor** öffnen → kompletten Inhalt von [`supabase/schema.sql`](supabase/schema.sql) einfügen → **Run**. („Success. No rows returned“ ist das erwartete Ergebnis.)
+
+   **Läuft die Datenbank schon länger?** Dann einmal [`supabase/migration-alles-nachziehen.sql`](supabase/migration-alles-nachziehen.sql) ausführen — die Sammeldatei enthält alle seither dazugekommenen Spalten, ist idempotent und ersetzt das Durchgehen der Einzel-Migrationen. Fehlt auch nur eine Spalte, schlägt der Log-Sync stillschweigend fehl (der Fehlertext steht dann unter „Mehr → Sync“).
 4. **Project Settings → API**: `Project URL` und den `anon public` Key kopieren.
 5. Im Projektordner:
    ```bash
@@ -90,6 +93,7 @@ Die sanfte tägliche Push-Erinnerung („Kurzer Check-in: Wie war gestern?“) b
 - **Eintrag-Modus pro Habit:** „Folgetag“ (Standard) für alles, was man lässt — um 14 Uhr weißt du noch nicht, wie der Tag um 23:59 ausgeht, deshalb ist heute gesperrt (auch im Kalender). „Gleicher Tag“ für Aktives wie Gym — einmal hin, Tag geschafft. Umschalten jederzeit unter „Mehr“ am Chip neben dem Habit; ältere Tage lassen sich immer nachtragen.
 - **30-Tage-%:** Anteil „on track“ an den *geloggten* Tagen der letzten 30 Kalendertage. Vergessene Tage zählen nicht in den Nenner — Vergessen wird nicht bestraft. Nachtragen geht jederzeit über den Kalender.
 - **Momentum:** startet bei 50, `+2` pro on-track-Tag, `−4/−8/−12` pro Ausrutscher je nach Stärke (unbewertet = mittel), immer zwischen 0 und 100. Nicht geloggte Tage frieren den Wert ein. Die Stärke wirkt bewusst **nur** aufs Momentum — die 30-Tage-% bleiben binär (Richtung, nicht Ausmaß). Konstanten in [`src/lib/config.ts`](src/lib/config.ts).
+- **Nur notiert ≠ bewertet:** Ein Tag, zu dem bisher nur eine Notiz existiert, zählt in **keiner** Zahl mit — nicht in den 30 Tagen, nicht im Momentum, nicht in den Mustern. Im Kalender steht er gestrichelt. Erst die Bewertung macht ihn zu einem gezählten Tag; Notiz und Trigger bleiben dabei erhalten.
 - **Muster:** erscheinen ab 3 „Heute nicht“-Einträgen — Trigger-Häufigkeit und Wochentagsverteilung.
 
 ## Tech-Stack

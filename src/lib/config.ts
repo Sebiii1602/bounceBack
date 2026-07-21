@@ -21,9 +21,22 @@ export const DEFAULT_TAGS: readonly string[] = [
   'Einsam',
   'Müde',
   'Gelangweilt',
-  'Vor Besuch',
+  'Frustriert',
+  'Traurig',
+  'Angespannt',
+  'Nach Streit',
+  'Alkohol',
+  'Unterwegs',
+  'Lange am Handy',
+  'Abends allein',
   'Sonstiges',
 ]
+
+/**
+ * Start-Trigger, die sich als zu speziell erwiesen haben — werden beim
+ * Datenbank-Upgrade entfernt, sofern sie in keinem Eintrag benutzt werden.
+ */
+export const RETIRED_DEFAULT_TAGS: readonly string[] = ['Vor Besuch']
 
 /**
  * Web-Push: öffentlicher VAPID-Schlüssel (darf im Code stehen).

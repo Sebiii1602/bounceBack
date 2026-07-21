@@ -3,7 +3,8 @@ import { dateKey, todayKey } from '../lib/dates'
 import { WEEKDAYS_DE } from '../lib/metrics'
 
 export interface DayInfo {
-  state: 'on' | 'off' | 'special'
+  /** `open` = nur notiert, noch nicht bewertet */
+  state: 'on' | 'off' | 'special' | 'open'
   hasNote: boolean
   /** Stärke bei „nicht on track“ — färbt den Sand etwas heller/kräftiger */
   severity?: 1 | 2 | 3
@@ -18,13 +19,10 @@ export function CalendarGrid({
   month,
   days,
   onPick,
-  allowToday = false,
 }: {
   month: Date
   days: Map<string, DayInfo>
   onPick: (dateKey: string) => void
-  /** Aktiv-Habits dürfen auch heute eintragen, Lass-Habits erst ab morgen */
-  allowToday?: boolean
 }) {
   const cells = eachDayOfInterval({
     start: startOfWeek(startOfMonth(month), { weekStartsOn: 1 }),
@@ -43,7 +41,9 @@ export function CalendarGrid({
         const key = dateKey(day)
         if (!isSameMonth(day, month)) return <div key={key} />
         const info = days.get(key)
-        const locked = allowToday ? key > today : key >= today
+        // Zukunft bleibt zu; heute lässt sich bei Folgetag-Habits zwar nicht
+        // bewerten, aber öffnen — dort liegen die Notizen zum laufenden Tag.
+        const locked = key > today
         const isToday = key === today
 
         let cls: string
@@ -53,6 +53,7 @@ export function CalendarGrid({
             info.severity === 1 ? 'bg-slip-soft/60' : info.severity === 3 ? 'bg-slip/40' : 'bg-slip-soft'
           cls = `${shade} font-medium text-slip-deep`
         } else if (info?.state === 'special') cls = 'bg-special-soft font-medium text-special-deep'
+        else if (info?.state === 'open') cls = 'border border-dashed border-faint/70 text-soft'
         else if (locked) cls = 'text-faint/50'
         else cls = 'border border-line/70 text-soft'
 
