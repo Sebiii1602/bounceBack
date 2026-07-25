@@ -9,6 +9,8 @@ import { Card, PageTitle } from '../components/ui'
 import { HabitSwitcher } from '../components/HabitSwitcher'
 import { CalendarGrid, type DayInfo } from '../components/CalendarGrid'
 import { DaySheet } from '../components/DaySheet'
+import { WeekProgress } from '../components/WeekProgress'
+import { perfectWeekCount, weekStrip } from '../lib/metrics'
 
 function LegendDot({ className, label }: { className: string; label: string }) {
   return (
@@ -92,6 +94,9 @@ export function History() {
             {copy.history.legendNote}
           </span>
         </div>
+      </Card>
+      <Card className="mt-3">
+        <WeekProgress days={weekStrip(logs ?? [])} perfectWeeks={perfectWeekCount(logs ?? [])} />
       </Card>
       {sheetDate && selected && (
         <DaySheet habit={selected} date={sheetDate} onClose={() => setSheetDate(null)} />

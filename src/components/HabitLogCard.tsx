@@ -9,7 +9,7 @@ import { Card } from './ui'
 import { LogButtons } from './LogButtons'
 import { LogDetails } from './LogDetails'
 import { JournalPanel } from './JournalPanel'
-import { WeekStrip } from './WeekStrip'
+import { WeekProgress } from './WeekProgress'
 
 export function HabitLogCard({ habit }: { habit: Habit }) {
   // Aktiv-Habits (Gym) sind heute eintragbar, Lass-Habits (Rauchen) erst am Folgetag
@@ -54,9 +54,8 @@ export function HabitLogCard({ habit }: { habit: Habit }) {
           {copy.today.statLine(pct === null ? '–' : `${pct} %`, momentum)}
         </span>
       </div>
-      <WeekStrip days={week} perfectWeeks={perfect} />
       {sameDay ? (
-        <p className="mt-2 text-xs text-faint">{copy.today.targetToday(fmtDayLong(day))}</p>
+        <p className="mt-0.5 text-xs text-faint">{copy.today.targetToday(fmtDayLong(day))}</p>
       ) : (
         <div className="mt-3 flex gap-2">
           {(['rate', 'journal'] as const).map((key) => (
@@ -123,6 +122,11 @@ export function HabitLogCard({ habit }: { habit: Habit }) {
           </>
         )}
       </div>
+      <WeekProgress
+        days={week}
+        perfectWeeks={perfect}
+        className="mt-4 border-t border-line pt-3"
+      />
     </Card>
   )
 }
