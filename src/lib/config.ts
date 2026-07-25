@@ -2,8 +2,13 @@
 export const MOMENTUM = {
   start: 50,
   up: 2,
-  /** Abzug nach Stärke des Ausrutschers: 1 = leicht, 2 = mittel (Default), 3 = deutlich */
-  down: { 1: -4, 2: -8, 3: -12 } as Record<1 | 2 | 3, number>,
+  /**
+   * Abzug nach Stärke des Ausrutschers: 1 = leicht, 2 = mittel (Default), 3 = deutlich.
+   * Bewusst spürbar: ein deutlicher Ausrutscher kostet genau sieben On-track-Tage,
+   * also eine Woche Aufbau — greifbar genug, um im Moment der Versuchung zu zählen,
+   * aber immer noch eine Delle statt eines Resets.
+   */
+  down: { 1: -6, 2: -10, 3: -14 } as Record<1 | 2 | 3, number>,
   min: 0,
   max: 100,
 } as const

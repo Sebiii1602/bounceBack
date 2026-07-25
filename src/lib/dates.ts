@@ -1,4 +1,4 @@
-import { addDays, format, parse } from 'date-fns'
+import { addDays, format, parse, startOfWeek } from 'date-fns'
 import { de } from 'date-fns/locale'
 
 /** Lokales Kalenderdatum als stabiler Schlüssel ('yyyy-MM-dd'). */
@@ -15,6 +15,10 @@ export const shiftKey = (key: string, days: number): string => dateKey(addDays(p
  * Heute ist bewusst gesperrt: ob der Tag „on track“ war, weiß man erst, wenn er vorbei ist.
  */
 export const yesterdayKey = (): string => shiftKey(todayKey(), -1)
+
+/** Montag der Woche, in der `key` liegt — Wochen laufen Mo–So. */
+export const mondayOf = (key: string): string =>
+  dateKey(startOfWeek(parseKey(key), { weekStartsOn: 1 }))
 
 /** „Sonntag, 6. Juli“ */
 export const fmtDayLong = (key: string): string => format(parseKey(key), 'EEEE, d. MMMM', { locale: de })

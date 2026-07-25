@@ -15,7 +15,9 @@
 - **Notieren, während der Tag noch läuft**: Bei Folgetag-Habits gibt es neben „Gestern bewerten“ den Tab „Heute notieren“ — für den Moment, in dem der Druck da ist. Trigger und Notiz landen am heutigen Tag, ohne ihn zu bewerten; morgen steht beides schon da, wenn der Tag drankommt. So wird der Tracker nebenbei zum Tagebuch
 - Trigger-Tags — Defaults plus eigene, direkt im Log-Flow anlegbar
 - Rolling 30-Tage-% (nicht geloggte Tage zählen nicht gegen dich) + Kurve über 30/60/90 Tage
-- Momentum-Score: +2 pro on-track-Tag, −4/−8/−12 pro Ausrutscher je nach Stärke (optional bewertbar: Leicht/Mittel/Deutlich — z. B. „wie weit über dem Kalorienbudget?“), begrenzt auf 0–100, Start bei 50. Mit Kurve und In-App-Erklärung (ⓘ) im Trend-Tab
+- Momentum-Score: +2 pro on-track-Tag, −6/−10/−14 pro Ausrutscher je nach Stärke (optional bewertbar: Leicht/Mittel/Deutlich — z. B. „wie weit über dem Kalorienbudget?“), begrenzt auf 0–100, Start bei 50. Mit Kurve und In-App-Erklärung (ⓘ) im Trend-Tab
+- **Perfekte Wochen**: Wochenstreifen (Mo–So) auf der Heute-Karte plus ein Lebenszeit-Zähler voller Wochen. Ein Sammelstand, kein Streak — er kann nur steigen, eine schlechte Woche nimmt nichts weg
+- Im Notieren-Tab steht, was ein Ausrutscher heute wirklich kosten würde („Momentum 62 → 52“) — geschätzt fällt das im Zweifel zu niedrig aus
 - Muster-Ansicht: häufigste Trigger + Wochentagsverteilung der „Heute nicht“-Tage (ab 3 Einträgen)
 - Kalender-Verlauf mit Nachtragen/Ändern beliebiger Tage
 - **Special Days**: richtig gute Tage blau hervorheben (mit Notiz und Triggern zum Erinnern) — sie zählen ganz normal als on track, das Blau ist nur die Krone obendrauf. Farbwechsel löscht nie Notizen. Tage mit Notiz tragen ein kleines Bookmark im Kalender
@@ -92,7 +94,8 @@ Die sanfte tägliche Push-Erinnerung („Kurzer Check-in: Wie war gestern?“) b
 
 - **Eintrag-Modus pro Habit:** „Folgetag“ (Standard) für alles, was man lässt — um 14 Uhr weißt du noch nicht, wie der Tag um 23:59 ausgeht, deshalb ist heute gesperrt (auch im Kalender). „Gleicher Tag“ für Aktives wie Gym — einmal hin, Tag geschafft. Umschalten jederzeit unter „Mehr“ am Chip neben dem Habit; ältere Tage lassen sich immer nachtragen.
 - **30-Tage-%:** Anteil „on track“ an den *geloggten* Tagen der letzten 30 Kalendertage. Vergessene Tage zählen nicht in den Nenner — Vergessen wird nicht bestraft. Nachtragen geht jederzeit über den Kalender.
-- **Momentum:** startet bei 50, `+2` pro on-track-Tag, `−4/−8/−12` pro Ausrutscher je nach Stärke (unbewertet = mittel), immer zwischen 0 und 100. Nicht geloggte Tage frieren den Wert ein. Die Stärke wirkt bewusst **nur** aufs Momentum — die 30-Tage-% bleiben binär (Richtung, nicht Ausmaß). Konstanten in [`src/lib/config.ts`](src/lib/config.ts).
+- **Momentum:** startet bei 50, `+2` pro on-track-Tag, `−6/−10/−14` pro Ausrutscher je nach Stärke (unbewertet = mittel), immer zwischen 0 und 100. Ein deutlicher Ausrutscher kostet damit genau sieben On-track-Tage — spürbar genug, um im Moment der Versuchung zu zählen, und trotzdem eine Delle statt eines Resets. Nicht geloggte Tage frieren den Wert ein. Die Stärke wirkt bewusst **nur** aufs Momentum — die 30-Tage-% bleiben binär (Richtung, nicht Ausmaß). Konstanten in [`src/lib/config.ts`](src/lib/config.ts).
+- **Perfekte Wochen:** eine Kalenderwoche Mo–So, in der **alle sieben Tage eingetragen und on track** waren. Bewusst streng — die Schärfe ist der Punkt. Der Zähler ist ein Sammelstand über die gesamte Nutzungsdauer und geht **nie** runter: eine schlechte Woche nimmt nichts weg, sie legt nur nichts dazu. Genau darin liegt der Unterschied zum Streak. Einen vergessenen Tag kannst du über den Kalender nachtragen, dann zählt die Woche weiterhin.
 - **Nur notiert ≠ bewertet:** Ein Tag, zu dem bisher nur eine Notiz existiert, zählt in **keiner** Zahl mit — nicht in den 30 Tagen, nicht im Momentum, nicht in den Mustern. Im Kalender steht er gestrichelt. Erst die Bewertung macht ihn zu einem gezählten Tag; Notiz und Trigger bleiben dabei erhalten.
 - **Muster:** erscheinen ab 3 „Heute nicht“-Einträgen — Trigger-Häufigkeit und Wochentagsverteilung.
 

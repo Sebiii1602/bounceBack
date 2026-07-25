@@ -3,12 +3,13 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db, setLogState } from '../lib/db'
 import { copy } from '../lib/copy'
 import { fmtDayLong, fmtDayShort, todayKey, yesterdayKey } from '../lib/dates'
-import { currentMomentum, currentRollingPct } from '../lib/metrics'
+import { currentMomentum, currentRollingPct, perfectWeekCount, weekStrip } from '../lib/metrics'
 import type { Habit } from '../lib/types'
 import { Card } from './ui'
 import { LogButtons } from './LogButtons'
 import { LogDetails } from './LogDetails'
 import { JournalPanel } from './JournalPanel'
+import { WeekStrip } from './WeekStrip'
 
 export function HabitLogCard({ habit }: { habit: Habit }) {
   // Aktiv-Habits (Gym) sind heute eintragbar, Lass-Habits (Rauchen) erst am Folgetag
@@ -32,6 +33,8 @@ export function HabitLogCard({ habit }: { habit: Habit }) {
 
   const pct = logs ? currentRollingPct(logs, 30, day) : null
   const momentum = currentMomentum(logs ?? [], day)
+  const week = weekStrip(logs ?? [], today)
+  const perfect = perfectWeekCount(logs ?? [])
   const hasJournal = !!todayLog && (todayLog.trigger_tags.length > 0 || (todayLog.note ?? '') !== '')
   // Am zu bewertenden Tag lag schon eine Notiz? Dann daran erinnern, bevor bewertet wird.
   const carried = log && !log.rated && (log.trigger_tags.length > 0 || (log.note ?? '') !== '')
@@ -51,8 +54,9 @@ export function HabitLogCard({ habit }: { habit: Habit }) {
           {copy.today.statLine(pct === null ? '–' : `${pct} %`, momentum)}
         </span>
       </div>
+      <WeekStrip days={week} perfectWeeks={perfect} />
       {sameDay ? (
-        <p className="mt-0.5 text-xs text-faint">{copy.today.targetToday(fmtDayLong(day))}</p>
+        <p className="mt-2 text-xs text-faint">{copy.today.targetToday(fmtDayLong(day))}</p>
       ) : (
         <div className="mt-3 flex gap-2">
           {(['rate', 'journal'] as const).map((key) => (

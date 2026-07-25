@@ -6,6 +6,9 @@ import {
   momentumSeries,
   rollingSeries,
   tagStats,
+  perfectWeekCount,
+  slipCost,
+  weekStrip,
   weekdayStats,
 } from './metrics'
 import type { LogEntry } from './types'
@@ -73,13 +76,13 @@ describe('momentum', () => {
     expect(currentMomentum([], TODAY)).toBe(MOMENTUM.start)
   })
 
-  it('rechnet +2 pro on-track und −8 pro Ausrutscher', () => {
+  it('rechnet +2 pro on-track und −10 pro Ausrutscher', () => {
     const logs = [
       mkLog('2026-07-04', true),
       mkLog('2026-07-05', true),
       mkLog('2026-07-06', false),
     ]
-    expect(currentMomentum(logs, TODAY)).toBe(50 + 2 + 2 - 8)
+    expect(currentMomentum(logs, TODAY)).toBe(50 + 2 + 2 - 10)
   })
 
   it('friert an nicht geloggten Tagen ein', () => {
@@ -89,14 +92,14 @@ describe('momentum', () => {
     expect(series.map((p) => p.value)).toEqual([52, 52, 52, 52, 52, 54])
   })
 
-  it('gewichtet Ausrutscher nach Stärke: −4 leicht, −8 mittel, −12 deutlich', () => {
+  it('gewichtet Ausrutscher nach Stärke: −6 leicht, −10 mittel, −14 deutlich', () => {
     const logs = [
       mkLog('2026-07-03', false, [], false, 1),
       mkLog('2026-07-04', false, [], false, 2),
       mkLog('2026-07-05', false, [], false, 3),
       mkLog('2026-07-06', false), // ohne Bewertung = mittel
     ]
-    expect(currentMomentum(logs, TODAY)).toBe(50 - 4 - 8 - 12 - 8)
+    expect(currentMomentum(logs, TODAY)).toBe(50 - 6 - 10 - 14 - 10)
   })
 
   it('Stärke ändert nichts an der 30-Tage-% — die bleibt binär', () => {
@@ -128,7 +131,7 @@ describe('special days', () => {
     ]
     // 04. + 05. on, 06. nicht → 2 von 3 ≈ 67 %
     expect(currentRollingPct(logs, 30, TODAY)).toBe(67)
-    expect(currentMomentum(logs, TODAY)).toBe(50 + 2 + 2 - 8)
+    expect(currentMomentum(logs, TODAY)).toBe(50 + 2 + 2 - 10)
   })
 
   it('tauchen nicht in den Trigger-Mustern auf (sie sind on track)', () => {
@@ -202,5 +205,77 @@ describe('unbewertete Notiz-Einträge', () => {
     const journal = mkUnrated('2026-07-05', ['Gestresst'])
     const nachBewertung: LogEntry = { ...journal, rated: true, on_track: false }
     expect(tagStats([nachBewertung])).toEqual([{ label: 'Gestresst', count: 1, share: 1 }])
+  })
+})
+
+describe('perfekte Wochen', () => {
+  /** Mo 29.06. – So 05.07.2026 ist eine vollständige Kalenderwoche */
+  const woche = (allOn = true): LogEntry[] =>
+    ['06-29', '06-30', '07-01', '07-02', '07-03', '07-04', '07-05'].map((d, i) =>
+      mkLog(`2026-${d}`, allOn || i !== 3),
+    )
+
+  it('zählt eine Woche mit sieben On-track-Tagen', () => {
+    expect(perfectWeekCount(woche())).toBe(1)
+  })
+
+  it('zählt sie nicht bei einem Ausrutscher', () => {
+    expect(perfectWeekCount(woche(false))).toBe(0)
+  })
+
+  it('zählt sie nicht, wenn ein Tag fehlt (6 von 7)', () => {
+    expect(perfectWeekCount(woche().slice(0, 6))).toBe(0)
+  })
+
+  it('zählt nur bewertete Tage — eine reine Notiz reicht nicht', () => {
+    const logs = woche()
+    logs[2] = { ...logs[2]!, rated: false }
+    expect(perfectWeekCount(logs)).toBe(0)
+  })
+
+  it('geht nie runter: eine schlechte Woche danach nimmt nichts weg', () => {
+    const spaeter = [mkLog('2026-07-06', false), mkLog('2026-07-07', false)]
+    expect(perfectWeekCount([...woche(), ...spaeter])).toBe(1)
+  })
+
+  it('summiert über mehrere Wochen (Mo–So, nicht rollierend)', () => {
+    // Zweite volle Woche: Mo 06.07. – So 12.07.
+    const zweite = [6, 7, 8, 9, 10, 11, 12].map((d) =>
+      mkLog(`2026-07-${String(d).padStart(2, '0')}`, true),
+    )
+    expect(perfectWeekCount([...woche(), ...zweite])).toBe(2)
+    // Sieben on-track-Tage quer über die Wochengrenze zählen dagegen nicht
+    const quer = [2, 3, 4, 5, 6, 7, 8].map((d) =>
+      mkLog(`2026-07-0${d}`, true),
+    )
+    expect(perfectWeekCount(quer)).toBe(0)
+  })
+})
+
+describe('weekStrip', () => {
+  it('zeigt Mo–So der laufenden Woche', () => {
+    // TODAY = Montag, 06.07. → Woche Mo 06.07. bis So 12.07.
+    const logs = [mkLog('2026-07-06', true), mkLog('2026-07-05', true)] // 05. = Vorwoche
+    expect(weekStrip(logs, TODAY)).toEqual(['on', 'none', 'none', 'none', 'none', 'none', 'none'])
+  })
+
+  it('unterscheidet on / off / kein Eintrag', () => {
+    const logs = [mkLog('2026-07-06', true), mkLog('2026-07-07', false)]
+    expect(weekStrip(logs, TODAY).slice(0, 3)).toEqual(['on', 'off', 'none'])
+  })
+})
+
+describe('slipCost', () => {
+  it('zeigt den echten Abzug statt einer Schätzung', () => {
+    const logs = [mkLog('2026-07-05', true)] // Momentum 52
+    expect(slipCost(logs, TODAY)).toEqual({ from: 52, to: 42 })
+  })
+
+  it('bleibt bei 0 stehen — nie darunter', () => {
+    expect(slipCost([mkLog('2026-07-05', true)], TODAY, 3)).toEqual({ from: 52, to: 38 })
+    const tief = Array.from({ length: 10 }, (_, i) =>
+      mkLog(`2026-06-${String(20 + i).padStart(2, '0')}`, false),
+    )
+    expect(slipCost(tief, TODAY).to).toBe(0)
   })
 })

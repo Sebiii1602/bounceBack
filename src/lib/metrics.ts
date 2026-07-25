@@ -1,5 +1,5 @@
 import { MOMENTUM } from './config'
-import { parseKey, shiftKey, todayKey } from './dates'
+import { mondayOf, parseKey, shiftKey, todayKey } from './dates'
 import type { LogEntry, Severity } from './types'
 
 export interface TrendPoint {
@@ -100,7 +100,7 @@ export function currentRollingPct(logs: LogEntry[], windowDays = 30, today = tod
 
 /**
  * Momentum als Ausdauerbalken: Start bei 50, geloggte Tage verschieben ihn
- * asymmetrisch (+2 pro on-track-Tag, −4/−8/−12 je nach Stärke des
+ * asymmetrisch (+2 pro on-track-Tag, −6/−10/−14 je nach Stärke des
  * Ausrutschers), begrenzt auf 0–100. Nicht geloggte Tage frieren ein.
  */
 export function momentumSeries(logs: LogEntry[], today = todayKey()): MomentumPoint[] {
@@ -123,6 +123,55 @@ export function momentumSeries(logs: LogEntry[], today = todayKey()): MomentumPo
 export function currentMomentum(logs: LogEntry[], today = todayKey()): number {
   const series = momentumSeries(logs, today)
   return series.length > 0 ? series[series.length - 1]!.value : MOMENTUM.start
+}
+
+/** Zustand eines Wochentags im Wochenstreifen. */
+export type WeekDayState = 'on' | 'off' | 'none'
+
+/**
+ * Wie viele Kalenderwochen (Mo–So) waren komplett on track?
+ *
+ * Ein reiner Sammelzähler: Er kann nur steigen — eine schlechte Woche nimmt
+ * nichts weg, sie legt nur nichts dazu. Genau das unterscheidet ihn vom Streak,
+ * der bei einem einzigen Ausrutscher alles kassiert.
+ *
+ * Sieben On-track-Tage in einer Woche gibt es nur, wenn wirklich alle sieben
+ * eingetragen und alle on track sind — deshalb reicht Zählen.
+ */
+export function perfectWeekCount(logs: LogEntry[]): number {
+  const byWeek = new Map<string, number>()
+  for (const l of logs) {
+    if (!isRated(l) || !l.on_track) continue
+    const monday = mondayOf(l.date)
+    byWeek.set(monday, (byWeek.get(monday) ?? 0) + 1)
+  }
+  let count = 0
+  for (const onTrackDays of byWeek.values()) if (onTrackDays === 7) count++
+  return count
+}
+
+/** Die laufende Woche als sieben Zustände, Montag zuerst. */
+export function weekStrip(logs: LogEntry[], today = todayKey()): WeekDayState[] {
+  const map = logMap(logs)
+  const monday = mondayOf(today)
+  const out: WeekDayState[] = []
+  for (let i = 0; i < 7; i++) {
+    const v = map.get(shiftKey(monday, i))
+    out.push(v === undefined ? 'none' : v.on ? 'on' : 'off')
+  }
+  return out
+}
+
+/**
+ * Was ein Ausrutscher gerade kosten würde — die Zahl, die im Moment der
+ * Versuchung fehlt, wenn man sie nur schätzt. Ohne Bewertung gilt „mittel“.
+ */
+export function slipCost(logs: LogEntry[], today = todayKey(), severity: Severity = 2): {
+  from: number
+  to: number
+} {
+  const from = currentMomentum(logs, today)
+  return { from, to: clamp(from + MOMENTUM.down[severity], MOMENTUM.min, MOMENTUM.max) }
 }
 
 export function relapseLogs(logs: LogEntry[]): LogEntry[] {
