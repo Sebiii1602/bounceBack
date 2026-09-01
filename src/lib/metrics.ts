@@ -1,5 +1,5 @@
 import { MOMENTUM } from './config'
-import { mondayOf, parseKey, shiftKey, todayKey } from './dates'
+import { parseKey, shiftKey, todayKey } from './dates'
 import type { LogEntry, Severity } from './types'
 
 export interface TrendPoint {
@@ -125,39 +125,80 @@ export function currentMomentum(logs: LogEntry[], today = todayKey()): number {
   return series.length > 0 ? series[series.length - 1]!.value : MOMENTUM.start
 }
 
-/** Zustand eines Wochentags im Wochenstreifen. */
+/** Zustand eines Tages im 7-Tage-Streifen. */
 export type WeekDayState = 'on' | 'off' | 'none'
 
-/**
- * Wie viele Kalenderwochen (Mo–So) waren komplett on track?
- *
- * Ein reiner Sammelzähler: Er kann nur steigen — eine schlechte Woche nimmt
- * nichts weg, sie legt nur nichts dazu. Genau das unterscheidet ihn vom Streak,
- * der bei einem einzigen Ausrutscher alles kassiert.
- *
- * Sieben On-track-Tage in einer Woche gibt es nur, wenn wirklich alle sieben
- * eingetragen und alle on track sind — deshalb reicht Zählen.
- */
-export function perfectWeekCount(logs: LogEntry[]): number {
-  const byWeek = new Map<string, number>()
-  for (const l of logs) {
-    if (!isRated(l) || !l.on_track) continue
-    const monday = mondayOf(l.date)
-    byWeek.set(monday, (byWeek.get(monday) ?? 0) + 1)
-  }
-  let count = 0
-  for (const onTrackDays of byWeek.values()) if (onTrackDays === 7) count++
-  return count
+export interface DayState {
+  date: string
+  state: WeekDayState
 }
 
-/** Die laufende Woche als sieben Zustände, Montag zuerst. */
-export function weekStrip(logs: LogEntry[], today = todayKey()): WeekDayState[] {
+/** Alle bewerteten Tage aufsteigend sortiert. */
+function ratedDays(logs: LogEntry[]): string[] {
+  return [...logMap(logs).keys()].sort()
+}
+
+/**
+ * Wie viele perfekte Wochen sind zusammengekommen?
+ *
+ * Eine perfekte Woche sind sieben aufeinanderfolgende On-track-Tage — egal an
+ * welchem Wochentag sie anfangen. Serien werden in Siebener-Blöcke geteilt und
+ * abgerundet: 13 Tage am Stück sind eine perfekte Woche, 14 sind zwei.
+ *
+ * Ein reiner Sammelzähler: Er kann nur steigen — ein schlechter Tag danach
+ * nimmt nichts weg, er beendet nur die laufende Serie. Genau das unterscheidet
+ * ihn vom Streak, der bei einem einzigen Ausrutscher alles kassiert.
+ *
+ * Unterbrochen wird eine Serie von einem Ausrutscher genauso wie von einer
+ * Lücke: Bei einem Tag ohne Eintrag ist schlicht nicht bekannt, wie er lief.
+ * Nachtragen über den Kalender schließt die Lücke jederzeit wieder.
+ */
+export function perfectWeekCount(logs: LogEntry[]): number {
   const map = logMap(logs)
-  const monday = mondayOf(today)
-  const out: WeekDayState[] = []
-  for (let i = 0; i < 7; i++) {
-    const v = map.get(shiftKey(monday, i))
-    out.push(v === undefined ? 'none' : v.on ? 'on' : 'off')
+  let total = 0
+  let run = 0
+  let prev: string | null = null
+  for (const date of ratedDays(logs)) {
+    const lueckenlos = prev !== null && shiftKey(prev, 1) === date
+    if (!map.get(date)!.on) {
+      total += Math.floor(run / 7)
+      run = 0
+    } else if (lueckenlos) {
+      run++
+    } else {
+      total += Math.floor(run / 7)
+      run = 1
+    }
+    prev = date
+  }
+  return total + Math.floor(run / 7)
+}
+
+/**
+ * Tage am Stück on track, rückwärts ab heute. Ist heute noch nicht bewertet
+ * (Folgetag-Habits, oder einfach noch nicht eingetragen), zählt die Serie ab
+ * gestern — sonst stünde sie den ganzen Tag über fälschlich auf null.
+ */
+export function currentStreak(logs: LogEntry[], today = todayKey()): number {
+  const map = logMap(logs)
+  let date = map.get(today) === undefined ? shiftKey(today, -1) : today
+  let run = 0
+  for (;;) {
+    const v = map.get(date)
+    if (v === undefined || !v.on) return run
+    run++
+    date = shiftKey(date, -1)
+  }
+}
+
+/** Die letzten sieben Kalendertage bis heute, ältester zuerst. */
+export function lastSevenDays(logs: LogEntry[], today = todayKey()): DayState[] {
+  const map = logMap(logs)
+  const out: DayState[] = []
+  for (let i = 6; i >= 0; i--) {
+    const date = shiftKey(today, -i)
+    const v = map.get(date)
+    out.push({ date, state: v === undefined ? 'none' : v.on ? 'on' : 'off' })
   }
   return out
 }

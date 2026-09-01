@@ -6,14 +6,22 @@ import {
   momentumSeries,
   rollingSeries,
   tagStats,
+  currentStreak,
+  lastSevenDays,
   perfectWeekCount,
   slipCost,
-  weekStrip,
   weekdayStats,
 } from './metrics'
+import { shiftKey } from './dates'
 import type { LogEntry } from './types'
 
 const TODAY = '2026-07-06' // ein Montag
+
+/** Nur notiert, noch nicht bewertet — hält Notiz/Trigger fest, zählt aber nirgends mit. */
+const mkUnrated = (date: string, tags: string[] = []): LogEntry => ({
+  ...mkLog(date, false, tags),
+  rated: false,
+})
 
 function mkLog(
   date: string,
@@ -171,11 +179,6 @@ describe('patterns', () => {
   })
 })
 
-/** Nur notiert, noch nicht bewertet — hält Notiz/Trigger fest, zählt aber nirgends mit. */
-function mkUnrated(date: string, tags: string[] = []): LogEntry {
-  return { ...mkLog(date, false, tags), rated: false }
-}
-
 describe('unbewertete Notiz-Einträge', () => {
   it('zählen nicht in die 30-Tage-%', () => {
     const rated = [mkLog('2026-07-04', true), mkLog('2026-07-05', true)]
@@ -209,59 +212,95 @@ describe('unbewertete Notiz-Einträge', () => {
 })
 
 describe('perfekte Wochen', () => {
-  /** Mo 29.06. – So 05.07.2026 ist eine vollständige Kalenderwoche */
-  const woche = (allOn = true): LogEntry[] =>
-    ['06-29', '06-30', '07-01', '07-02', '07-03', '07-04', '07-05'].map((d, i) =>
-      mkLog(`2026-${d}`, allOn || i !== 3),
-    )
+  /** `n` Tage am Stück on track, endend am 05.07. (Sonntag) */
+  const serie = (n: number, on = true): LogEntry[] =>
+    Array.from({ length: n }, (_, i) => mkLog(shiftKey('2026-07-05', i - n + 1), on))
 
-  it('zählt eine Woche mit sieben On-track-Tagen', () => {
-    expect(perfectWeekCount(woche())).toBe(1)
+  it('zählt sieben Tage am Stück — egal an welchem Wochentag sie starten', () => {
+    // Di 30.06. bis Mo 06.07., quer über das Wochenende
+    const quer = Array.from({ length: 7 }, (_, i) => mkLog(shiftKey('2026-06-30', i), true))
+    expect(perfectWeekCount(quer)).toBe(1)
   })
 
-  it('zählt sie nicht bei einem Ausrutscher', () => {
-    expect(perfectWeekCount(woche(false))).toBe(0)
+  it('zählt sechs Tage noch nicht', () => {
+    expect(perfectWeekCount(serie(6))).toBe(0)
   })
 
-  it('zählt sie nicht, wenn ein Tag fehlt (6 von 7)', () => {
-    expect(perfectWeekCount(woche().slice(0, 6))).toBe(0)
+  it('rundet ab: 13 Tage sind eine Woche, 14 sind zwei', () => {
+    expect(perfectWeekCount(serie(13))).toBe(1)
+    expect(perfectWeekCount(serie(14))).toBe(2)
+  })
+
+  it('ein Ausrutscher mittendrin unterbricht die Serie', () => {
+    const logs = serie(8)
+    logs[3] = { ...logs[3]!, on_track: false }
+    expect(perfectWeekCount(logs)).toBe(0)
+  })
+
+  it('eine Lücke unterbricht genauso — der Tag ist schlicht unbekannt', () => {
+    const logs = serie(8).filter((l) => l.date !== '2026-07-01')
+    expect(perfectWeekCount(logs)).toBe(0)
   })
 
   it('zählt nur bewertete Tage — eine reine Notiz reicht nicht', () => {
-    const logs = woche()
+    const logs = serie(7)
     logs[2] = { ...logs[2]!, rated: false }
     expect(perfectWeekCount(logs)).toBe(0)
   })
 
-  it('geht nie runter: eine schlechte Woche danach nimmt nichts weg', () => {
-    const spaeter = [mkLog('2026-07-06', false), mkLog('2026-07-07', false)]
-    expect(perfectWeekCount([...woche(), ...spaeter])).toBe(1)
+  it('geht nie runter: schlechte Tage danach nehmen nichts weg', () => {
+    const danach = [mkLog('2026-07-06', false), mkLog('2026-07-07', false)]
+    expect(perfectWeekCount([...serie(7), ...danach])).toBe(1)
   })
 
-  it('summiert über mehrere Wochen (Mo–So, nicht rollierend)', () => {
-    // Zweite volle Woche: Mo 06.07. – So 12.07.
-    const zweite = [6, 7, 8, 9, 10, 11, 12].map((d) =>
-      mkLog(`2026-07-${String(d).padStart(2, '0')}`, true),
-    )
-    expect(perfectWeekCount([...woche(), ...zweite])).toBe(2)
-    // Sieben on-track-Tage quer über die Wochengrenze zählen dagegen nicht
-    const quer = [2, 3, 4, 5, 6, 7, 8].map((d) =>
-      mkLog(`2026-07-0${d}`, true),
-    )
-    expect(perfectWeekCount(quer)).toBe(0)
+  it('summiert getrennte Serien', () => {
+    const frueh = Array.from({ length: 7 }, (_, i) => mkLog(shiftKey('2026-06-01', i), true))
+    expect(perfectWeekCount([...frueh, ...serie(7)])).toBe(2)
   })
 })
 
-describe('weekStrip', () => {
-  it('zeigt Mo–So der laufenden Woche', () => {
-    // TODAY = Montag, 06.07. → Woche Mo 06.07. bis So 12.07.
-    const logs = [mkLog('2026-07-06', true), mkLog('2026-07-05', true)] // 05. = Vorwoche
-    expect(weekStrip(logs, TODAY)).toEqual(['on', 'none', 'none', 'none', 'none', 'none', 'none'])
+describe('currentStreak', () => {
+  it('zählt die Tage am Stück bis heute', () => {
+    const logs = [mkLog('2026-07-04', true), mkLog('2026-07-05', true), mkLog('2026-07-06', true)]
+    expect(currentStreak(logs, TODAY)).toBe(3)
+  })
+
+  it('zählt ab gestern weiter, wenn heute noch nicht bewertet ist', () => {
+    const logs = [mkLog('2026-07-04', true), mkLog('2026-07-05', true)]
+    expect(currentStreak(logs, TODAY)).toBe(2)
+    // Eine reine Notiz für heute ändert daran nichts
+    expect(currentStreak([...logs, mkUnrated(TODAY)], TODAY)).toBe(2)
+  })
+
+  it('endet an einem Ausrutscher', () => {
+    const logs = [mkLog('2026-07-04', false), mkLog('2026-07-05', true), mkLog('2026-07-06', true)]
+    expect(currentStreak(logs, TODAY)).toBe(2)
+  })
+
+  it('endet an einer Lücke', () => {
+    const logs = [mkLog('2026-07-03', true), mkLog('2026-07-06', true)]
+    expect(currentStreak(logs, TODAY)).toBe(1)
+  })
+
+  it('ist 0, wenn der letzte bewertete Tag ein Ausrutscher war', () => {
+    expect(currentStreak([mkLog('2026-07-06', false)], TODAY)).toBe(0)
+  })
+})
+
+describe('lastSevenDays', () => {
+  it('liefert sieben Tage, heute zuletzt', () => {
+    const days = lastSevenDays([], TODAY)
+    expect(days).toHaveLength(7)
+    expect(days[0]!.date).toBe('2026-06-30')
+    expect(days[6]!.date).toBe(TODAY)
+    expect(days.every((d) => d.state === 'none')).toBe(true)
   })
 
   it('unterscheidet on / off / kein Eintrag', () => {
-    const logs = [mkLog('2026-07-06', true), mkLog('2026-07-07', false)]
-    expect(weekStrip(logs, TODAY).slice(0, 3)).toEqual(['on', 'off', 'none'])
+    const logs = [mkLog('2026-07-05', true), mkLog('2026-07-06', false)]
+    const states = lastSevenDays(logs, TODAY).map((d) => d.state)
+    expect(states.slice(5)).toEqual(['on', 'off'])
+    expect(states.slice(0, 5).every((s) => s === 'none')).toBe(true)
   })
 })
 

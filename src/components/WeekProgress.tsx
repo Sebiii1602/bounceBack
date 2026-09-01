@@ -1,8 +1,8 @@
 import { copy } from '../lib/copy'
-import { mondayOf, shiftKey, todayKey } from '../lib/dates'
-import { WEEKDAYS_DE, type WeekDayState } from '../lib/metrics'
+import { fmtWeekdayShort, todayKey } from '../lib/dates'
+import type { DayState, WeekDayState } from '../lib/metrics'
 
-/** Farben wie im Kalender — dieselbe Woche soll überall gleich aussehen. */
+/** Farben wie im Kalender — derselbe Tag soll überall gleich aussehen. */
 const CELL: Record<WeekDayState, string> = {
   on: 'bg-track-soft text-track-deep',
   off: 'bg-slip-soft text-slip-deep',
@@ -10,24 +10,25 @@ const CELL: Record<WeekDayState, string> = {
 }
 
 /**
- * Die laufende Woche als sieben Kacheln plus der Lebenszeit-Zähler perfekter
- * Wochen. Bewusst ein Sammelstand, kein Streak: Der Zähler kann nur steigen,
- * die Woche startet jeden Montag neu — es gibt nichts zu verlieren, nur etwas
- * zu holen. Ist die Woche schon geplatzt, zeigt sie nach vorn statt zurück.
+ * Die letzten sieben Tage als Kacheln, dazu die laufende Serie und der
+ * Lebenszeit-Zähler perfekter Wochen.
+ *
+ * Bewusst ein Sammelstand, kein Streak: Der Zähler kann nur steigen, ein
+ * schlechter Tag beendet nur die laufende Serie — es gibt nichts zu verlieren,
+ * nur etwas zu holen.
  */
 export function WeekProgress({
   days,
+  streak,
   perfectWeeks,
   className = '',
 }: {
-  days: WeekDayState[]
+  days: DayState[]
+  streak: number
   perfectWeeks: number
   className?: string
 }) {
   const today = todayKey()
-  const monday = mondayOf(today)
-  const done = days.filter((d) => d === 'on').length
-  const broken = days.includes('off')
 
   return (
     <div className={className}>
@@ -35,24 +36,19 @@ export function WeekProgress({
         <span className="text-xs font-medium uppercase tracking-wider text-faint">
           {copy.today.weekTitle}
         </span>
-        <span className="text-sm font-medium text-soft">
-          {broken ? copy.today.weekNext : copy.today.weekProgress(done)}
-        </span>
+        <span className="text-sm font-medium text-soft">{copy.today.streak(streak)}</span>
       </div>
       <div className="grid grid-cols-7 gap-1.5">
-        {days.map((state, i) => {
-          const day = shiftKey(monday, i)
-          return (
-            <div
-              key={day}
-              className={`flex aspect-square items-center justify-center rounded-lg text-xs font-medium ${
-                CELL[state]
-              } ${day === today ? 'ring-1 ring-track' : ''}`}
-            >
-              {WEEKDAYS_DE[i]}
-            </div>
-          )
-        })}
+        {days.map(({ date, state }) => (
+          <div
+            key={date}
+            className={`flex aspect-square items-center justify-center rounded-lg text-xs font-medium ${
+              CELL[state]
+            } ${date === today ? 'ring-1 ring-track' : ''}`}
+          >
+            {fmtWeekdayShort(date)}
+          </div>
+        ))}
       </div>
       <div className="mt-3">
         {perfectWeeks > 0 ? (

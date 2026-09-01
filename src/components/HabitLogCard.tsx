@@ -3,7 +3,13 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db, setLogState } from '../lib/db'
 import { copy } from '../lib/copy'
 import { fmtDayLong, fmtDayShort, todayKey, yesterdayKey } from '../lib/dates'
-import { currentMomentum, currentRollingPct, perfectWeekCount, weekStrip } from '../lib/metrics'
+import {
+  currentMomentum,
+  currentRollingPct,
+  currentStreak,
+  lastSevenDays,
+  perfectWeekCount,
+} from '../lib/metrics'
 import type { Habit } from '../lib/types'
 import { Card } from './ui'
 import { LogButtons } from './LogButtons'
@@ -33,7 +39,8 @@ export function HabitLogCard({ habit }: { habit: Habit }) {
 
   const pct = logs ? currentRollingPct(logs, 30, day) : null
   const momentum = currentMomentum(logs ?? [], day)
-  const week = weekStrip(logs ?? [], today)
+  const week = lastSevenDays(logs ?? [], today)
+  const streak = currentStreak(logs ?? [], today)
   const perfect = perfectWeekCount(logs ?? [])
   const hasJournal = !!todayLog && (todayLog.trigger_tags.length > 0 || (todayLog.note ?? '') !== '')
   // Am zu bewertenden Tag lag schon eine Notiz? Dann daran erinnern, bevor bewertet wird.
@@ -124,6 +131,7 @@ export function HabitLogCard({ habit }: { habit: Habit }) {
       </div>
       <WeekProgress
         days={week}
+        streak={streak}
         perfectWeeks={perfect}
         className="mt-4 border-t border-line pt-3"
       />
