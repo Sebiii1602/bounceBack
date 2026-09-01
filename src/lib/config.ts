@@ -65,4 +65,8 @@ export const RETIRED_DEFAULT_TAGS: readonly string[] = ['Vor Besuch']
 export const VAPID_PUBLIC_KEY =
   'BFGPFRZbUxTdmpZ5lUZK-x-X8ZzIWnLfmB2nHm0WdIOuyyI9A5tlOH8R0KJrqZ5JBnhAV-POjnIrYJCcuvIPmO4'
 
-export const APP_VERSION = '0.1.0'
+/**
+ * Fassung, die gerade läuft — zur Bauzeit eingesetzt, nicht von Hand gepflegt.
+ * `commit` ist der kurze Git-Hash, `date` der Zeitpunkt des Builds (ISO).
+ */
+export const APP_BUILD: { commit: string; date: string } = __APP_BUILD__

@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { addHabit, addTag, db, deleteTag, renameHabit, renameTag, setHabitLogMode, sortTags } from '../lib/db'
 import { copy } from '../lib/copy'
-import { APP_VERSION } from '../lib/config'
+import { APP_BUILD } from '../lib/config'
 import { fmtTime } from '../lib/dates'
 import { deleteHabitEverywhere, syncNow, useSyncStatus } from '../lib/sync'
 import { useAuth } from '../lib/auth'
@@ -423,7 +423,7 @@ export function More() {
         </div>
       </Card>
       <p className="mt-6 text-center text-xs text-faint">
-        {copy.appName} · v{APP_VERSION}
+        {copy.appName} · {copy.more.build(fmtTime(APP_BUILD.date), APP_BUILD.commit)}
       </p>
     </div>
   )

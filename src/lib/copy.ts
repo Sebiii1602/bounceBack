@@ -130,6 +130,7 @@ export const copy = {
       'Mitteilungen sind blockiert — in den System-Einstellungen für bounceBack erlauben und nochmal versuchen.',
     reminderActive: (hour: number) => `Aktiv — täglich gegen ${hour}:00 Uhr`,
     reminderTime: 'Uhrzeit',
+    build: (zeit: string, commit: string) => `Stand ${zeit} · ${commit}`,
   },
 
   onboarding: {
