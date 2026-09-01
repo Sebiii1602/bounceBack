@@ -69,10 +69,10 @@ export const copy = {
     headlinePct: 'der letzten 30 Tage on track',
     noData: 'Noch keine Einträge — ab dem ersten Log entsteht hier deine Kurve.',
     momentum: 'Momentum',
-    momentumHint: 'Steigt langsam, sinkt bei einem Ausrutscher nur leicht — nie auf null.',
+    momentumHint: 'Folgt deinen letzten Wochen — steigt mit guten Tagen, dippt bei Ausrutschern, stürzt nie ab.',
     momentumInfoLabel: 'Was ist Momentum?',
     momentumInfo:
-      'Dein Ausdauerbalken. Er startet bei 50 und jeder On-track-Tag (auch Special Days) gibt +2. Ein „Nicht on track“-Tag zieht ab — je nach Stärke −6, −10 oder −14 — aber nie auf null: ein Ausrutscher ist ein Dip, kein Absturz. Ein deutlicher kostet dich damit genau eine Woche Aufbau. Tage ohne Eintrag ändern nichts. Kurz: Die 30-Tage-% zeigen deine Richtung, Momentum zeigt, wie viel Puffer du dir aufgebaut hast.',
+      'Dein Ausdauerbalken. Jeder eingetragene Tag zieht ihn ein Stück zu sich: ein On-track-Tag (auch Special Days) nach oben, ein Ausrutscher nach unten — je nach Stärke unterschiedlich weit. Neuere Tage wiegen dabei schwerer als alte. Dadurch pendelt er sich ungefähr dort ein, wo deine Quote der letzten Wochen liegt: rund 83 bei 80 % on track, rund 92 bei 90 %. Aus einem Tief kommst du schnell hoch, weil dort jeder gute Tag viel bringt — weiter oben wird Halten zäher, und ein Ausrutscher kostet oben mehr als unten. Tage ohne Eintrag ändern nichts. Kurz: Die 30-Tage-% zeigen deinen Schnitt, Momentum zeigt, wie es gerade läuft.',
     days: (n: number) => `${n} Tage`,
     patterns: 'Muster',
     patternsEmpty: 'Noch nicht genug Daten — Muster erscheinen nach ein paar Einträgen.',

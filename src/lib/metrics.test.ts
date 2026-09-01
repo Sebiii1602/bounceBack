@@ -79,35 +79,42 @@ describe('rollingSeries', () => {
   })
 })
 
+/** `days` Tage mit gleichmäßig verteilter On-track-Quote, endend an TODAY. */
+function mkQuote(days: number, quote: number, severity: LogEntry['severity'] = null): LogEntry[] {
+  return Array.from({ length: days }, (_, i) => {
+    const on = Math.floor((i + 1) * quote) > Math.floor(i * quote)
+    return mkLog(shiftKey(TODAY, i - days + 1), on, [], false, on ? null : severity)
+  })
+}
+
 describe('momentum', () => {
   it('startet bei 50 ohne Logs', () => {
     expect(currentMomentum([], TODAY)).toBe(MOMENTUM.start)
   })
 
-  it('rechnet +2 pro on-track und −10 pro Ausrutscher', () => {
+  it('zieht pro Tag ein Zehntel Richtung Tageswert', () => {
+    // 50 → 55 → 59,5 → 55,05
     const logs = [
       mkLog('2026-07-04', true),
       mkLog('2026-07-05', true),
       mkLog('2026-07-06', false),
     ]
-    expect(currentMomentum(logs, TODAY)).toBe(50 + 2 + 2 - 10)
+    expect(currentMomentum(logs, TODAY)).toBe(55)
   })
 
   it('friert an nicht geloggten Tagen ein', () => {
     const logs = [mkLog('2026-07-01', true), mkLog('2026-07-06', true)]
     const series = momentumSeries(logs, TODAY)
     expect(series).toHaveLength(6)
-    expect(series.map((p) => p.value)).toEqual([52, 52, 52, 52, 52, 54])
+    expect(series.map((p) => p.value)).toEqual([55, 55, 55, 55, 55, 60])
   })
 
-  it('gewichtet Ausrutscher nach Stärke: −6 leicht, −10 mittel, −14 deutlich', () => {
-    const logs = [
-      mkLog('2026-07-03', false, [], false, 1),
-      mkLog('2026-07-04', false, [], false, 2),
-      mkLog('2026-07-05', false, [], false, 3),
-      mkLog('2026-07-06', false), // ohne Bewertung = mittel
-    ]
-    expect(currentMomentum(logs, TODAY)).toBe(50 - 6 - 10 - 14 - 10)
+  it('gewichtet Ausrutscher nach Stärke — leicht zieht weniger tief als deutlich', () => {
+    const stand = (severity: LogEntry['severity']) =>
+      currentMomentum([mkLog(TODAY, false, [], false, severity)], TODAY)
+    expect(stand(1)).toBeGreaterThan(stand(2))
+    expect(stand(2)).toBeGreaterThan(stand(3))
+    expect(stand(null)).toBe(stand(2)) // unbewertet zählt wie mittel
   })
 
   it('Stärke ändert nichts an der 30-Tage-% — die bleibt binär', () => {
@@ -115,18 +122,38 @@ describe('momentum', () => {
     expect(currentRollingPct(logs, 30, TODAY)).toBe(50)
   })
 
-  it('bleibt in den Grenzen 0–100 — nie ein Reset', () => {
-    const manyBad: LogEntry[] = []
-    for (let i = 0; i < 20; i++) {
-      manyBad.push(mkLog(`2026-06-${String(10 + i).padStart(2, '0')}`, false))
+  it('bleibt immer zwischen 0 und 100', () => {
+    for (const logs of [mkQuote(200, 1), mkQuote(200, 0, 3), mkQuote(200, 0.5)]) {
+      for (const p of momentumSeries(logs, TODAY)) {
+        expect(p.value).toBeGreaterThanOrEqual(MOMENTUM.min)
+        expect(p.value).toBeLessThanOrEqual(MOMENTUM.max)
+      }
     }
-    expect(currentMomentum(manyBad, TODAY)).toBe(0)
+  })
 
-    const manyGood: LogEntry[] = []
-    for (let i = 1; i <= 30; i++) {
-      manyGood.push(mkLog(`2026-06-${String(i).padStart(2, '0')}`, true))
+  it('pendelt sich dort ein, wo die Quote liegt — kein Absturz bei guten 80 %', () => {
+    // Der eigentliche Grund für die Umstellung: die alte Formel hatte einen
+    // Kipppunkt bei 83 % und schickte 80 % unaufhaltsam auf 0.
+    const bei80 = currentMomentum(mkQuote(150, 0.8), TODAY)
+    expect(bei80).toBeGreaterThan(75)
+    expect(bei80).toBeLessThan(90)
+  })
+
+  it('ordnet bessere Quoten höher ein', () => {
+    const bei = (q: number) => currentMomentum(mkQuote(150, q), TODAY)
+    expect(bei(0.9)).toBeGreaterThan(bei(0.8))
+    expect(bei(0.8)).toBeGreaterThan(bei(0.6))
+    expect(bei(0.6)).toBeGreaterThan(bei(0.4))
+  })
+
+  it('erholt sich aus dem Tief schneller als es oben weiter steigt', () => {
+    const zuwachs = (start: LogEntry[]) => {
+      const vorher = currentMomentum(start, shiftKey(TODAY, -1))
+      return currentMomentum([...start, mkLog(TODAY, true)], TODAY) - vorher
     }
-    expect(currentMomentum(manyGood, TODAY)).toBe(100)
+    const tief = zuwachs(mkQuote(60, 0, 3).slice(0, -1))
+    const hoch = zuwachs(mkQuote(60, 1).slice(0, -1))
+    expect(tief).toBeGreaterThan(hoch)
   })
 })
 
@@ -139,7 +166,7 @@ describe('special days', () => {
     ]
     // 04. + 05. on, 06. nicht → 2 von 3 ≈ 67 %
     expect(currentRollingPct(logs, 30, TODAY)).toBe(67)
-    expect(currentMomentum(logs, TODAY)).toBe(50 + 2 + 2 - 10)
+    expect(currentMomentum(logs, TODAY)).toBe(55)
   })
 
   it('tauchen nicht in den Trigger-Mustern auf (sie sind on track)', () => {
@@ -306,15 +333,25 @@ describe('lastSevenDays', () => {
 
 describe('slipCost', () => {
   it('zeigt den echten Abzug statt einer Schätzung', () => {
-    const logs = [mkLog('2026-07-05', true)] // Momentum 52
-    expect(slipCost(logs, TODAY)).toEqual({ from: 52, to: 42 })
+    const logs = [mkLog('2026-07-05', true)] // Momentum 55
+    expect(slipCost(logs, TODAY)).toEqual({ from: 55, to: 51 })
   })
 
-  it('bleibt bei 0 stehen — nie darunter', () => {
-    expect(slipCost([mkLog('2026-07-05', true)], TODAY, 3)).toEqual({ from: 52, to: 38 })
-    const tief = Array.from({ length: 10 }, (_, i) =>
-      mkLog(`2026-06-${String(20 + i).padStart(2, '0')}`, false),
-    )
-    expect(slipCost(tief, TODAY).to).toBe(0)
+  it('ein deutlicher Ausrutscher kostet mehr als ein leichter', () => {
+    const logs = [mkLog('2026-07-05', true)]
+    expect(slipCost(logs, TODAY, 3).to).toBeLessThan(slipCost(logs, TODAY, 2).to)
+    expect(slipCost(logs, TODAY, 2).to).toBeLessThan(slipCost(logs, TODAY, 1).to)
+  })
+
+  it('kostet oben mehr als unten — unten gibt es kaum noch etwas zu verlieren', () => {
+    const oben = slipCost(mkQuote(150, 1), TODAY)
+    const unten = slipCost(mkQuote(150, 0, 3), TODAY)
+    expect(oben.from - oben.to).toBeGreaterThan(unten.from - unten.to)
+  })
+
+  it('bleibt in den Grenzen 0–100', () => {
+    const { from, to } = slipCost(mkQuote(150, 0, 3), TODAY, 3)
+    expect(to).toBeGreaterThanOrEqual(0)
+    expect(from).toBeLessThanOrEqual(100)
   })
 })

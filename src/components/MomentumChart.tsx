@@ -59,6 +59,9 @@ export function MomentumChart({ data }: { data: MomentumPoint[] }) {
           strokeWidth={2}
           fill="url(#momentumFill)"
           dot={false}
+          // Siehe TrendChart: nachgeladene Daten würden die Animation
+          // abwürgen und die Fläche unsichtbar lassen.
+          isAnimationActive={false}
         />
       </AreaChart>
     </ResponsiveContainer>

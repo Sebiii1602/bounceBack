@@ -54,6 +54,9 @@ export function TrendChart({ data }: { data: TrendPoint[] }) {
           strokeWidth={2}
           dot={dot}
           connectNulls
+          // Ohne das bleibt die Aufbau-Animation hängen, wenn die Logs erst
+          // nach dem Mount aus Dexie eintreffen — die Kurve bliebe unsichtbar.
+          isAnimationActive={false}
         />
       </LineChart>
     </ResponsiveContainer>

@@ -98,31 +98,53 @@ export function currentRollingPct(logs: LogEntry[], windowDays = 30, today = tod
   return rollingSeries(logs, 1, windowDays, today)[0]!.pct
 }
 
+/** Wohin ein Tag den Wert zieht. */
+const dayTarget = (v: DayValue): number =>
+  v.on ? MOMENTUM.onTarget : MOMENTUM.offTarget[v.severity]
+
 /**
- * Momentum als Ausdauerbalken: Start bei 50, geloggte Tage verschieben ihn
- * asymmetrisch (+2 pro on-track-Tag, −6/−10/−14 je nach Stärke des
- * Ausrutschers), begrenzt auf 0–100. Nicht geloggte Tage frieren ein.
+ * Momentum als Ausdauerbalken: Start bei 50, jeder geloggte Tag zieht den Wert
+ * ein Stück (`rate`) in Richtung dieses Tages. Nicht geloggte Tage frieren ein.
+ *
+ * Dadurch pendelt sich der Wert von selbst dort ein, wo die Quote der letzten
+ * Wochen liegt, statt an einem Kipppunkt nach oben oder unten wegzulaufen —
+ * und jüngere Tage wiegen automatisch schwerer als alte. Genau das
+ * unterscheidet Momentum von den 30-Tage-%: nicht der Schnitt, sondern wie es
+ * gerade läuft.
+ *
+ * Intern wird ungerundet gerechnet, sonst würden kleine Schritte durch
+ * wiederholtes Runden verschluckt.
  */
-export function momentumSeries(logs: LogEntry[], today = todayKey()): MomentumPoint[] {
+function momentumRaw(logs: LogEntry[], today = todayKey()): { date: string; value: number }[] {
   const map = logMap(logs)
   if (map.size === 0) return []
   const first = [...map.keys()].sort()[0]!
 
-  const out: MomentumPoint[] = []
+  const out: { date: string; value: number }[] = []
   let value: number = MOMENTUM.start
   for (let d = first; d <= today; d = shiftKey(d, 1)) {
     const v = map.get(d)
-    if (v !== undefined) {
-      value = clamp(value + (v.on ? MOMENTUM.up : MOMENTUM.down[v.severity]), MOMENTUM.min, MOMENTUM.max)
-    }
+    if (v !== undefined) value += MOMENTUM.rate * (dayTarget(v) - value)
     out.push({ date: d, value })
   }
   return out
 }
 
-export function currentMomentum(logs: LogEntry[], today = todayKey()): number {
-  const series = momentumSeries(logs, today)
+export function momentumSeries(logs: LogEntry[], today = todayKey()): MomentumPoint[] {
+  return momentumRaw(logs, today).map((p) => ({
+    date: p.date,
+    value: clamp(Math.round(p.value), MOMENTUM.min, MOMENTUM.max),
+  }))
+}
+
+/** Ungerundeter Stand von heute — Basis für Folgerechnungen wie `slipCost`. */
+function currentMomentumRaw(logs: LogEntry[], today = todayKey()): number {
+  const series = momentumRaw(logs, today)
   return series.length > 0 ? series[series.length - 1]!.value : MOMENTUM.start
+}
+
+export function currentMomentum(logs: LogEntry[], today = todayKey()): number {
+  return clamp(Math.round(currentMomentumRaw(logs, today)), MOMENTUM.min, MOMENTUM.max)
 }
 
 /** Zustand eines Tages im 7-Tage-Streifen. */
@@ -207,12 +229,17 @@ export function lastSevenDays(logs: LogEntry[], today = todayKey()): DayState[] 
  * Was ein Ausrutscher gerade kosten würde — die Zahl, die im Moment der
  * Versuchung fehlt, wenn man sie nur schätzt. Ohne Bewertung gilt „mittel“.
  */
-export function slipCost(logs: LogEntry[], today = todayKey(), severity: Severity = 2): {
-  from: number
-  to: number
-} {
-  const from = currentMomentum(logs, today)
-  return { from, to: clamp(from + MOMENTUM.down[severity], MOMENTUM.min, MOMENTUM.max) }
+export function slipCost(
+  logs: LogEntry[],
+  today = todayKey(),
+  severity: Severity = 2,
+): { from: number; to: number } {
+  const raw = currentMomentumRaw(logs, today)
+  const nach = raw + MOMENTUM.rate * (MOMENTUM.offTarget[severity] - raw)
+  return {
+    from: clamp(Math.round(raw), MOMENTUM.min, MOMENTUM.max),
+    to: clamp(Math.round(nach), MOMENTUM.min, MOMENTUM.max),
+  }
 }
 
 export function relapseLogs(logs: LogEntry[]): LogEntry[] {

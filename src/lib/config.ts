@@ -1,14 +1,29 @@
-/** Momentum: asymmetrisch aber begrenzt — nie ein Reset auf null. */
+/**
+ * Momentum zieht sich jeden geloggten Tag ein Stück in Richtung dieses Tages:
+ * ein On-track-Tag nach oben, ein Ausrutscher nach unten. Dadurch pendelt sich
+ * der Wert von selbst dort ein, wo die Quote der letzten Wochen liegt —
+ * ~83 bei 80 % on track, ~92 bei 90 %.
+ *
+ * Die frühere Variante addierte feste Beträge (+2 / −8). Das hatte einen
+ * Kipppunkt bei 80 % Quote: Wer knapp darunter lag, rutschte unaufhaltsam auf
+ * 0 — auch bei objektiv guten 80 %. Genau das soll die App nicht tun.
+ *
+ * Die Asymmetrie entsteht jetzt von allein: Weit unten bringt ein guter Tag
+ * viel und ein Ausrutscher kostet fast nichts, weit oben ist es umgekehrt.
+ * Erholung aus dem Tief geht schnell, oben halten wird zäh.
+ */
 export const MOMENTUM = {
   start: 50,
-  up: 2,
+  /** Wie weit sich der Wert pro geloggtem Tag dem Tageswert nähert (0–1). */
+  rate: 0.1,
+  /** Wohin ein On-track-Tag zieht (auch Special Days). */
+  onTarget: 100,
   /**
-   * Abzug nach Stärke des Ausrutschers: 1 = leicht, 2 = mittel (Default), 3 = deutlich.
-   * Bewusst spürbar: ein deutlicher Ausrutscher kostet genau sieben On-track-Tage,
-   * also eine Woche Aufbau — greifbar genug, um im Moment der Versuchung zu zählen,
-   * aber immer noch eine Delle statt eines Resets.
+   * Wohin ein Ausrutscher zieht, je nach Stärke: 1 = leicht, 2 = mittel
+   * (Default), 3 = deutlich. Bei 80 % Quote ergibt das ~87 / ~83 / ~80 —
+   * die Stärke spreizt spürbar, ohne den Wert abstürzen zu lassen.
    */
-  down: { 1: -6, 2: -10, 3: -14 } as Record<1 | 2 | 3, number>,
+  offTarget: { 1: 35, 2: 15, 3: 0 } as Record<1 | 2 | 3, number>,
   min: 0,
   max: 100,
 } as const
