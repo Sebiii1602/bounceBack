@@ -6,6 +6,7 @@ import type { DayState, WeekDayState } from '../lib/metrics'
 const CELL: Record<WeekDayState, string> = {
   on: 'bg-track-soft text-track-deep',
   off: 'bg-slip-soft text-slip-deep',
+  paused: 'bg-rest-soft text-rest-deep',
   none: 'border border-line/70 text-faint',
 }
 
@@ -19,13 +20,17 @@ const CELL: Record<WeekDayState, string> = {
  */
 export function WeekProgress({
   days,
-  streak,
+  headline,
   perfectWeeks,
+  goalLabel,
   className = '',
 }: {
   days: DayState[]
-  streak: number
+  /** Rechts oben: laufende Serie oder Wochenstand bei Ziel-Habits */
+  headline: string
   perfectWeeks: number
+  /** Erklärt bei null perfekten Wochen, was eine ausmacht */
+  goalLabel: string
   className?: string
 }) {
   const today = todayKey()
@@ -36,7 +41,7 @@ export function WeekProgress({
         <span className="text-xs font-medium uppercase tracking-wider text-faint">
           {copy.today.weekTitle}
         </span>
-        <span className="text-sm font-medium text-soft">{copy.today.streak(streak)}</span>
+        <span className="text-sm font-medium text-soft">{headline}</span>
       </div>
       <div className="grid grid-cols-7 gap-1.5">
         {days.map(({ date, state }) => (
@@ -59,7 +64,7 @@ export function WeekProgress({
             {copy.today.perfectWeeks(perfectWeeks)}
           </span>
         ) : (
-          <p className="text-xs text-faint">{copy.today.perfectWeekGoal}</p>
+          <p className="text-xs text-faint">{goalLabel}</p>
         )}
       </div>
     </div>

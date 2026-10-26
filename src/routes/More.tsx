@@ -1,6 +1,17 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { addHabit, addTag, db, deleteTag, renameHabit, renameTag, setHabitLogMode, sortTags } from '../lib/db'
+import {
+  addHabit,
+  addTag,
+  db,
+  deleteTag,
+  renameHabit,
+  renameTag,
+  setHabitLogMode,
+  setHabitPromptDeck,
+  setHabitTarget,
+  sortTags,
+} from '../lib/db'
 import { copy } from '../lib/copy'
 import { APP_BUILD } from '../lib/config'
 import { fmtTime } from '../lib/dates'
@@ -16,6 +27,100 @@ import {
 } from '../lib/push'
 import { Card, SectionLabel, PageTitle } from '../components/ui'
 import { LogModeChips } from '../components/LogModeChips'
+import { HabitSwitcher } from '../components/HabitSwitcher'
+import { ALL_DECKS, DECK_LABEL } from '../lib/prompts'
+import type { Habit, PromptDeck } from '../lib/types'
+
+const WEEK_TARGETS = [null, 1, 2, 3, 4, 5] as const
+
+function Chip({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean
+  onClick: () => void
+  children: ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-full border px-3 py-1.5 text-sm transition ${
+        active ? 'border-ink bg-ink text-card' : 'border-line bg-card text-soft'
+      }`}
+    >
+      {children}
+    </button>
+  )
+}
+
+/**
+ * Einstellungen pro Habit. Bewusst eine eigene Karte statt Chips in der Liste:
+ * Eintrag-Modus, Wochenziel und Tagesimpuls passen nicht nebeneinander in eine
+ * Zeile, und ein Wochenziel ändert die Bedeutung der anderen Optionen.
+ */
+function HabitOptions({ habits }: { habits: Habit[] }) {
+  const [picked, setPicked] = useState<string | null>(null)
+  const habit = habits.find((h) => h.id === picked) ?? habits[0]
+  if (!habit) return null
+  const isGoal = habit.target_per_week !== null
+
+  return (
+    <Card className="mt-3">
+      <SectionLabel>{copy.more.habitSetup}</SectionLabel>
+      {habits.length > 1 && (
+        <HabitSwitcher habits={habits} value={habit.id} onChange={setPicked} />
+      )}
+      <p className="mb-2 text-xs text-faint">{copy.more.targetLabel}</p>
+      <div className="flex flex-wrap gap-2">
+        {WEEK_TARGETS.map((t) => (
+          <Chip
+            key={String(t)}
+            active={habit.target_per_week === t}
+            onClick={() => void setHabitTarget(habit.id, t)}
+          >
+            {t === null ? copy.more.targetDaily : `${t}×`}
+          </Chip>
+        ))}
+      </div>
+      <p className="mt-2 text-xs text-faint">
+        {isGoal ? copy.more.targetHintGoal : copy.more.targetHintDaily}
+      </p>
+
+      {!isGoal && (
+        <>
+          <p className="mb-2 mt-4 text-xs text-faint">{copy.more.modeLabel}</p>
+          <LogModeChips
+            value={habit.log_same_day}
+            onChange={(v) => void setHabitLogMode(habit.id, v)}
+          />
+          <p className="mt-2 text-xs text-faint">{copy.today.modeHint}</p>
+        </>
+      )}
+
+      <p className="mb-2 mt-4 text-xs text-faint">{copy.more.promptLabel}</p>
+      <div className="flex flex-wrap gap-2">
+        <Chip
+          active={habit.prompt_deck === null}
+          onClick={() => void setHabitPromptDeck(habit.id, null)}
+        >
+          {copy.more.promptNone}
+        </Chip>
+        {ALL_DECKS.map((deck: PromptDeck) => (
+          <Chip
+            key={deck}
+            active={habit.prompt_deck === deck}
+            onClick={() => void setHabitPromptDeck(habit.id, deck)}
+          >
+            {DECK_LABEL[deck]}
+          </Chip>
+        ))}
+      </div>
+      <p className="mt-2 text-xs text-faint">{copy.more.promptHint}</p>
+    </Card>
+  )
+}
 
 function AppearanceCard() {
   const [pref, setPref] = useState<ThemePref>(() => getThemePref())
@@ -368,23 +473,10 @@ export function More() {
           onRename={renameHabit}
           onDelete={removeHabit}
           confirmMsg={copy.more.deleteHabitConfirm}
-          renderMeta={(item) => {
-            const habit = habits?.find((h) => h.id === item.id)
-            if (!habit) return null
-            return (
-              <button
-                type="button"
-                onClick={() => void setHabitLogMode(habit.id, !habit.log_same_day)}
-                title={copy.today.modeHint}
-                className="mr-1 rounded-full border border-line px-2 py-0.5 text-[11px] text-soft transition hover:text-ink"
-              >
-                {habit.log_same_day ? copy.more.logModeSame : copy.more.logModeNext}
-              </button>
-            )
-          }}
           addExtra={<LogModeChips value={newSameDay} onChange={setNewSameDay} />}
         />
       </Card>
+      <HabitOptions habits={habits ?? []} />
       <Card className="mt-3">
         <SectionLabel>{copy.more.tags}</SectionLabel>
         <NameList

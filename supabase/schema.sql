@@ -7,6 +7,10 @@ create table if not exists public.habits (
   name text not null,
   -- true = am selben Tag eintragbar (Gym), false = erst am Folgetag (Rauchen)
   log_same_day boolean not null default false,
+  -- Ziel-Habit: n-mal pro Woche reicht (null = täglich bewerten)
+  target_per_week smallint check (target_per_week is null or target_per_week between 1 and 7),
+  -- Tagesimpuls beim Öffnen (z. B. 'italienisch')
+  prompt_deck text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -29,6 +33,8 @@ create table if not exists public.logs (
   on_track boolean not null,
   -- Special Day: Highlight — zählt ganz normal als on track
   special boolean not null default false,
+  -- Pausiert (verletzt/krank): zählt nirgends, unterbricht keine Serie
+  paused boolean not null default false,
   -- Stärke eines Ausrutschers (1 leicht / 2 mittel / 3 deutlich), wirkt nur aufs Momentum
   severity smallint check (severity between 1 and 3),
   trigger_tags text[] not null default '{}',

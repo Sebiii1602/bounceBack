@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, deleteLog, setLogSpecial, setLogState } from '../lib/db'
+import { db, deleteLog, setLogSpecial, setLogState, toggleLogPaused } from '../lib/db'
 import { copy } from '../lib/copy'
 import { fmtDayLong, todayKey } from '../lib/dates'
 import type { Habit } from '../lib/types'
@@ -23,7 +23,9 @@ export function DaySheet({
     [habit.id, date],
   )
   // Ein laufender Tag lässt sich noch nicht bewerten — nur notieren
-  const rateable = date < todayKey() || habit.log_same_day
+  const rateable = date < todayKey() || habit.log_same_day || habit.target_per_week !== null
+  // Pausieren ergibt nur bei Habits Sinn, die man aktiv tut
+  const kannPausieren = habit.log_same_day || habit.target_per_week !== null
 
   // Hintergrund festhalten, solange das Sheet offen ist: sonst scrollt auf dem
   // iPhone die Seite dahinter mit und man erwischt den Inhalt kaum.
@@ -66,7 +68,7 @@ export function DaySheet({
                 </p>
               )}
               <LogButtons
-                value={log?.rated && !log.special ? log.on_track : null}
+                value={log?.rated && !log.special && !log.paused ? log.on_track : null}
                 onSelect={(onTrack) => {
                   void setLogState(habit.id, date, onTrack)
                   // „On track“ braucht keine Details mehr — Sheet direkt zu.
@@ -88,7 +90,25 @@ export function DaySheet({
                 </svg>
                 {copy.today.specialDay}
               </button>
-              {log?.rated && <LogDetails log={log} onDone={onClose} />}
+              {kannPausieren && (
+                <button
+                  type="button"
+                  onClick={() => void toggleLogPaused(habit.id, date)}
+                  className={`mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl border py-3 text-[15px] font-medium transition active:scale-[0.98] ${
+                    log?.paused
+                      ? 'border-rest bg-rest text-white'
+                      : 'border-rest/25 bg-rest-soft text-rest-deep'
+                  }`}
+                >
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <rect x="3" y="7" width="18" height="13" rx="2" />
+                    <path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                    <path d="M12 11.5v4M10 13.5h4" />
+                  </svg>
+                  {copy.today.paused}
+                </button>
+              )}
+              {log?.rated && !log.paused && <LogDetails log={log} onDone={onClose} />}
             </>
           ) : (
             <>

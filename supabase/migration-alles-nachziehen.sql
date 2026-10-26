@@ -21,6 +21,12 @@ alter table public.logs add column if not exists severity smallint;
 -- 23.07.2026 — Notizen am laufenden Tag, bevor der Tag bewertbar ist
 alter table public.logs add column if not exists rated boolean not null default true;
 
+-- 26.10.2026 — Pausierte Tage (verletzt/krank) und Ziel-Habits
+alter table public.logs add column if not exists paused boolean not null default false;
+alter table public.habits add column if not exists target_per_week smallint
+  check (target_per_week is null or target_per_week between 1 and 7);
+alter table public.habits add column if not exists prompt_deck text;
+
 -- 14.07.2026 — Tags konvergieren über (user_id, label) statt über feste IDs.
 -- Vorher prüfen, ob es Dubletten gibt (muss 0 Zeilen liefern):
 --   select user_id, label, count(*) from public.tags

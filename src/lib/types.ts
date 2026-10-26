@@ -3,9 +3,23 @@ export interface Habit {
   name: string
   /** true = am selben Tag eintragbar (Aktiv-Habit, z. B. Gym); false = erst am Folgetag (Lass-Habit, z. B. Rauchen) */
   log_same_day: boolean
+  /**
+   * Ziel-Habit: `n`-mal pro Woche reicht (z. B. 2× Gym). null = täglich bewerten.
+   * Bei einem Ziel-Habit wird nur eingetragen, was stattgefunden hat — ein Tag
+   * ohne Eintrag ist kein Fehler, sondern einfach kein Trainingstag.
+   */
+  target_per_week: number | null
+  /**
+   * Tagesimpuls: kleiner Inhalt, der beim Öffnen erscheint (z. B. ein
+   * italienischer Absatz). null = keiner.
+   */
+  prompt_deck: PromptDeck | null
   created_at: string
   updated_at: string
 }
+
+/** Verfügbare Tagesimpuls-Sammlungen (siehe `src/lib/prompts/`). */
+export type PromptDeck = 'italienisch'
 
 /** Stärke eines „Nicht on track“-Tags: 1 = leicht, 2 = mittel, 3 = deutlich */
 export type Severity = 1 | 2 | 3
@@ -27,6 +41,13 @@ export interface LogEntry {
    * Zählt ganz normal als on track — `special` ist nur die Krone obendrauf.
    */
   special: boolean
+  /**
+   * Pausiert: Der Tag konnte nicht stattfinden — verletzt, krank, Zwangspause.
+   * Kein Ausrutscher, sondern ein Tag außer Konkurrenz: zählt in keiner Metrik,
+   * friert das Momentum ein und **unterbricht keine Serie**, sondern überbrückt
+   * sie. Nur bei Habits sinnvoll, die man aktiv tut.
+   */
+  paused: boolean
   /**
    * Wie stark war der Ausrutscher? Nur relevant, wenn nicht on track;
    * null = nicht bewertet und zählt wie „mittel“. Wirkt nur aufs Momentum,

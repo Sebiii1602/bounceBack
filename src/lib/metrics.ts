@@ -1,5 +1,5 @@
 import { MOMENTUM } from './config'
-import { parseKey, shiftKey, todayKey } from './dates'
+import { mondayOf, parseKey, shiftKey, todayKey } from './dates'
 import type { LogEntry, Severity } from './types'
 
 export interface TrendPoint {
@@ -31,8 +31,11 @@ export const WEEKDAYS_DE = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'] as const
 
 const clamp = (v: number, min: number, max: number): number => Math.min(max, Math.max(min, v))
 
+/** `paused` = konnte nicht (verletzt/krank) — zählt nirgends, bricht aber nichts ab. */
+export type DayKind = 'on' | 'off' | 'paused'
+
 interface DayValue {
-  on: boolean
+  kind: DayKind
   /** null (nicht bewertet) zählt wie „mittel“ */
   severity: Severity
 }
@@ -49,10 +52,17 @@ function logMap(logs: LogEntry[]): Map<string, DayValue> {
   // Special Days zählen ganz normal (sie sind on track — nur mit Krone)
   for (const l of logs) {
     if (!isRated(l)) continue
-    m.set(l.date, { on: l.on_track, severity: l.severity ?? 2 })
+    m.set(l.date, {
+      kind: l.paused ? 'paused' : l.on_track ? 'on' : 'off',
+      severity: l.severity ?? 2,
+    })
   }
   return m
 }
+
+/** Zählt der Tag in die Quote? Pausen stehen außer Konkurrenz. */
+const zaehlt = (v: DayValue | undefined): v is DayValue =>
+  v !== undefined && v.kind !== 'paused'
 
 /**
  * Rollierender Anteil „on track“ pro Tag über `spanDays`, Fenster `windowDays`.
@@ -75,16 +85,16 @@ export function rollingSeries(
   let onTrack = 0
   for (let i = 0; i < total; i++) {
     const v = map.get(keys[i])
-    if (v !== undefined) {
+    if (zaehlt(v)) {
       logged++
-      if (v.on) onTrack++
+      if (v.kind === 'on') onTrack++
     }
     const leaving = i - windowDays
     if (leaving >= 0) {
       const w = map.get(keys[leaving])
-      if (w !== undefined) {
+      if (zaehlt(w)) {
         logged--
-        if (w.on) onTrack--
+        if (w.kind === 'on') onTrack--
       }
     }
     if (i >= total - spanDays) {
@@ -100,7 +110,7 @@ export function currentRollingPct(logs: LogEntry[], windowDays = 30, today = tod
 
 /** Wohin ein Tag den Wert zieht. */
 const dayTarget = (v: DayValue): number =>
-  v.on ? MOMENTUM.onTarget : MOMENTUM.offTarget[v.severity]
+  v.kind === 'on' ? MOMENTUM.onTarget : MOMENTUM.offTarget[v.severity]
 
 /**
  * Momentum als Ausdauerbalken: Start bei 50, jeder geloggte Tag zieht den Wert
@@ -117,14 +127,15 @@ const dayTarget = (v: DayValue): number =>
  */
 function momentumRaw(logs: LogEntry[], today = todayKey()): { date: string; value: number }[] {
   const map = logMap(logs)
-  if (map.size === 0) return []
-  const first = [...map.keys()].sort()[0]!
+  const gezaehlt = [...map.keys()].filter((d) => zaehlt(map.get(d))).sort()
+  if (gezaehlt.length === 0) return []
+  const first = gezaehlt[0]!
 
   const out: { date: string; value: number }[] = []
   let value: number = MOMENTUM.start
   for (let d = first; d <= today; d = shiftKey(d, 1)) {
     const v = map.get(d)
-    if (v !== undefined) value += MOMENTUM.rate * (dayTarget(v) - value)
+    if (zaehlt(v)) value += MOMENTUM.rate * (dayTarget(v) - value)
     out.push({ date: d, value })
   }
   return out
@@ -148,7 +159,7 @@ export function currentMomentum(logs: LogEntry[], today = todayKey()): number {
 }
 
 /** Zustand eines Tages im 7-Tage-Streifen. */
-export type WeekDayState = 'on' | 'off' | 'none'
+export type WeekDayState = DayKind | 'none'
 
 export interface DayState {
   date: string
@@ -182,10 +193,18 @@ export function perfectWeekCount(logs: LogEntry[]): number {
   let prev: string | null = null
   for (const date of ratedDays(logs)) {
     const lueckenlos = prev !== null && shiftKey(prev, 1) === date
-    if (!map.get(date)!.on) {
+    const kind = map.get(date)!.kind
+    if (kind === 'paused') {
+      // Überbrückt: eine Verletzung beendet die Serie nicht, sie hält sie an.
+      // Nur eine echte Lücke davor bricht sie trotzdem ab.
+      if (!lueckenlos && prev !== null) {
+        total += Math.floor(run / 7)
+        run = 0
+      }
+    } else if (kind === 'off') {
       total += Math.floor(run / 7)
       run = 0
-    } else if (lueckenlos) {
+    } else if (lueckenlos || run === 0) {
       run++
     } else {
       total += Math.floor(run / 7)
@@ -207,8 +226,9 @@ export function currentStreak(logs: LogEntry[], today = todayKey()): number {
   let run = 0
   for (;;) {
     const v = map.get(date)
-    if (v === undefined || !v.on) return run
-    run++
+    if (v === undefined || v.kind === 'off') return run
+    // Pausentage überspringen, ohne die Serie zu beenden
+    if (v.kind === 'on') run++
     date = shiftKey(date, -1)
   }
 }
@@ -220,9 +240,154 @@ export function lastSevenDays(logs: LogEntry[], today = todayKey()): DayState[] 
   for (let i = 6; i >= 0; i--) {
     const date = shiftKey(today, -i)
     const v = map.get(date)
-    out.push({ date, state: v === undefined ? 'none' : v.on ? 'on' : 'off' })
+    out.push({ date, state: v === undefined ? 'none' : v.kind })
   }
   return out
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Ziel-Habits: „n-mal pro Woche reicht"
+//
+// Hier wird nur eingetragen, was stattgefunden hat — ein Tag ohne Eintrag ist
+// kein Fehler, sondern einfach kein Trainingstag. Deshalb rechnet alles gegen
+// ein Soll statt gegen eine Quote: Wer 2× pro Woche will und 2× da war, steht
+// bei 100 %, nicht bei 29 %.
+// ──────────────────────────────────────────────────────────────────────────
+
+interface WindowCount {
+  done: number
+  paused: number
+}
+
+/** On-track- und Pausentage in den sieben Tagen bis einschließlich `day`. */
+function countWindow(map: Map<string, DayValue>, day: string): WindowCount {
+  let done = 0
+  let paused = 0
+  for (let i = 0; i < 7; i++) {
+    const v = map.get(shiftKey(day, -i))
+    if (v === undefined) continue
+    if (v.kind === 'paused') paused++
+    else if (v.kind === 'on') done++
+  }
+  return { done, paused }
+}
+
+/**
+ * Soll, um Pausentage gekürzt: Wer die halbe Woche verletzt war, soll auch nur
+ * das halbe Ziel schaffen müssen. Mindestens 1, solange überhaupt ein Tag
+ * nutzbar war — sonst stünde das Ziel bei 0 und wäre trivial erfüllt.
+ */
+function effectiveTarget(target: number, paused: number): number {
+  if (paused >= 7) return 0
+  return Math.max(1, Math.ceil((target * (7 - paused)) / 7))
+}
+
+/** Zielerfüllung 0–1 über die sieben Tage bis `day`, gedeckelt bei 1. */
+export function goalFulfillment(logs: LogEntry[], target: number, day = todayKey()): number {
+  const { done, paused } = countWindow(logMap(logs), day)
+  const soll = effectiveTarget(target, paused)
+  return soll === 0 ? 1 : Math.min(1, done / soll)
+}
+
+/** Zielerfüllung in Prozent — das Gegenstück zu `currentRollingPct`. */
+export function currentGoalPct(logs: LogEntry[], target: number, today = todayKey()): number | null {
+  if (logMap(logs).size === 0) return null
+  return Math.round(goalFulfillment(logs, target, today) * 100)
+}
+
+/** Verlauf der Zielerfüllung für die Kurve. */
+export function goalSeries(
+  logs: LogEntry[],
+  target: number,
+  spanDays: number,
+  today = todayKey(),
+): TrendPoint[] {
+  const map = logMap(logs)
+  const out: TrendPoint[] = []
+  for (let i = spanDays - 1; i >= 0; i--) {
+    const date = shiftKey(today, -i)
+    const { done, paused } = countWindow(map, date)
+    const soll = effectiveTarget(target, paused)
+    out.push({ date, pct: soll === 0 ? 100 : Math.round(Math.min(1, done / soll) * 100) })
+  }
+  return out
+}
+
+/**
+ * Momentum für Ziel-Habits: Es zieht täglich Richtung der Zielerfüllung des
+ * rollierenden Sieben-Tage-Fensters. Wer sein Ziel dauerhaft hält, landet bei
+ * 100; wer die Hälfte schafft, bei ~50.
+ */
+export function goalMomentumSeries(
+  logs: LogEntry[],
+  target: number,
+  today = todayKey(),
+): MomentumPoint[] {
+  const map = logMap(logs)
+  if (map.size === 0) return []
+  const first = [...map.keys()].sort()[0]!
+
+  const out: MomentumPoint[] = []
+  let value: number = MOMENTUM.start
+  for (let d = first; d <= today; d = shiftKey(d, 1)) {
+    const { done, paused } = countWindow(map, d)
+    const soll = effectiveTarget(target, paused)
+    const ziel = soll === 0 ? value : Math.min(1, done / soll) * MOMENTUM.onTarget
+    value += MOMENTUM.rate * (ziel - value)
+    out.push({ date: d, value: clamp(Math.round(value), MOMENTUM.min, MOMENTUM.max) })
+  }
+  return out
+}
+
+export function currentGoalMomentum(
+  logs: LogEntry[],
+  target: number,
+  today = todayKey(),
+): number {
+  const series = goalMomentumSeries(logs, target, today)
+  return series.length > 0 ? series[series.length - 1]!.value : MOMENTUM.start
+}
+
+/** Stand der laufenden Kalenderwoche: wie viele von wie vielen. */
+export function weekGoalProgress(
+  logs: LogEntry[],
+  target: number,
+  today = todayKey(),
+): { done: number; target: number } {
+  const map = logMap(logs)
+  const monday = mondayOf(today)
+  let done = 0
+  let paused = 0
+  for (let i = 0; i < 7; i++) {
+    const v = map.get(shiftKey(monday, i))
+    if (v === undefined) continue
+    if (v.kind === 'paused') paused++
+    else if (v.kind === 'on') done++
+  }
+  return { done, target: effectiveTarget(target, paused) }
+}
+
+/**
+ * Perfekte Wochen bei Ziel-Habits: Kalenderwochen (Mo–So), in denen das Ziel
+ * erreicht wurde. Anders als bei täglichen Habits zählt hier die Woche als
+ * Einheit — „3× die Woche" bezieht sich ja genau darauf.
+ */
+export function goalPerfectWeeks(logs: LogEntry[], target: number): number {
+  const map = logMap(logs)
+  const byWeek = new Map<string, WindowCount>()
+  for (const [date, v] of map) {
+    const monday = mondayOf(date)
+    const w = byWeek.get(monday) ?? { done: 0, paused: 0 }
+    if (v.kind === 'paused') w.paused++
+    else if (v.kind === 'on') w.done++
+    byWeek.set(monday, w)
+  }
+  let count = 0
+  for (const { done, paused } of byWeek.values()) {
+    const soll = effectiveTarget(target, paused)
+    if (soll > 0 && done >= soll) count++
+  }
+  return count
 }
 
 /**
@@ -243,7 +408,7 @@ export function slipCost(
 }
 
 export function relapseLogs(logs: LogEntry[]): LogEntry[] {
-  return logs.filter((l) => isRated(l) && !l.on_track)
+  return logs.filter((l) => isRated(l) && !l.paused && !l.on_track)
 }
 
 /** Trigger-Häufigkeit über alle „Heute nicht“-Tage, absteigend sortiert. */

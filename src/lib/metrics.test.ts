@@ -6,10 +6,14 @@ import {
   momentumSeries,
   rollingSeries,
   tagStats,
+  currentGoalMomentum,
+  currentGoalPct,
   currentStreak,
+  goalPerfectWeeks,
   lastSevenDays,
   perfectWeekCount,
   slipCost,
+  weekGoalProgress,
   weekdayStats,
 } from './metrics'
 import { shiftKey } from './dates'
@@ -36,6 +40,7 @@ function mkLog(
     date,
     rated: true,
     on_track: onTrack,
+    paused: false,
     special,
     severity,
     trigger_tags: tags,
@@ -353,5 +358,119 @@ describe('slipCost', () => {
     const { from, to } = slipCost(mkQuote(150, 0, 3), TODAY, 3)
     expect(to).toBeGreaterThanOrEqual(0)
     expect(from).toBeLessThanOrEqual(100)
+  })
+})
+
+/** Pausiert: verletzt oder krank — zählt nirgends, bricht aber nichts ab. */
+const mkPause = (date: string): LogEntry => ({ ...mkLog(date, false), paused: true })
+
+describe('pausierte Tage', () => {
+  it('zählen nicht in die 30-Tage-%', () => {
+    const logs = [mkLog('2026-07-04', true), mkLog('2026-07-05', true)]
+    expect(currentRollingPct(logs, 30, TODAY)).toBe(100)
+    expect(currentRollingPct([...logs, mkPause(TODAY)], 30, TODAY)).toBe(100)
+  })
+
+  it('lassen das Momentum unverändert', () => {
+    const logs = [mkLog('2026-07-05', true)]
+    const vorher = currentMomentum(logs, TODAY)
+    expect(currentMomentum([...logs, mkPause(TODAY)], TODAY)).toBe(vorher)
+  })
+
+  it('tauchen nicht in den Trigger-Mustern auf', () => {
+    const logs = [mkLog('2026-07-04', false, ['Einsam']), mkPause('2026-07-05')]
+    expect(weekdayStats(logs).reduce((s, w) => s + w.count, 0)).toBe(1)
+  })
+
+  it('überbrücken eine Serie, statt sie zu beenden', () => {
+    // 3 on track, Pause, 4 on track = 7 Tage → trotz Unterbrechung eine Woche
+    const logs = [
+      mkLog('2026-06-29', true),
+      mkLog('2026-06-30', true),
+      mkLog('2026-07-01', true),
+      mkPause('2026-07-02'),
+      mkLog('2026-07-03', true),
+      mkLog('2026-07-04', true),
+      mkLog('2026-07-05', true),
+      mkLog('2026-07-06', true),
+    ]
+    expect(perfectWeekCount(logs)).toBe(1)
+    expect(currentStreak(logs, TODAY)).toBe(7)
+  })
+
+  it('ein echter Ausrutscher unterbricht dagegen weiterhin', () => {
+    const logs = [
+      mkLog('2026-06-29', true),
+      mkLog('2026-06-30', true),
+      mkLog('2026-07-01', true),
+      mkLog('2026-07-02', false),
+      mkLog('2026-07-03', true),
+      mkLog('2026-07-04', true),
+      mkLog('2026-07-05', true),
+      mkLog('2026-07-06', true),
+    ]
+    expect(perfectWeekCount(logs)).toBe(0)
+    expect(currentStreak(logs, TODAY)).toBe(4)
+  })
+
+  it('erscheinen als eigener Zustand im 7-Tage-Streifen', () => {
+    expect(lastSevenDays([mkPause(TODAY)], TODAY)[6]!.state).toBe('paused')
+  })
+})
+
+describe('Ziel-Habits (n-mal pro Woche)', () => {
+  /** Mo 06.07. ist TODAY — diese Woche hat also erst einen Tag. */
+  const inDieserWoche = (tage: string[]) => tage.map((d) => mkLog(d, true))
+
+  it('rechnet die Erfüllung gegen das Ziel, nicht gegen alle Tage', () => {
+    // 2x pro Woche, 2x da → 100 %, nicht 29 %
+    const logs = inDieserWoche(['2026-07-05', '2026-07-06'])
+    expect(currentGoalPct(logs, 2, TODAY)).toBe(100)
+  })
+
+  it('deckelt bei 100 %, wer mehr macht als nötig', () => {
+    const logs = inDieserWoche(['2026-07-02', '2026-07-03', '2026-07-05', '2026-07-06'])
+    expect(currentGoalPct(logs, 2, TODAY)).toBe(100)
+  })
+
+  it('zeigt Teilerfüllung ehrlich an', () => {
+    expect(currentGoalPct(inDieserWoche(['2026-07-06']), 4, TODAY)).toBe(25)
+  })
+
+  it('zählt eine erreichte Kalenderwoche als perfekte Woche', () => {
+    // Mo 29.06. – So 05.07.: zweimal da bei Ziel 2
+    const logs = inDieserWoche(['2026-06-30', '2026-07-02'])
+    expect(goalPerfectWeeks(logs, 2)).toBe(1)
+    expect(goalPerfectWeeks(logs, 3)).toBe(0)
+  })
+
+  it('kürzt das Ziel um Pausentage — verletzt heißt nicht gescheitert', () => {
+    // Fünf Tage verletzt, einmal da: Soll sinkt von 3 auf 1
+    const logs = [
+      mkPause('2026-07-01'),
+      mkPause('2026-07-02'),
+      mkPause('2026-07-03'),
+      mkPause('2026-07-04'),
+      mkPause('2026-07-05'),
+      mkLog('2026-07-06', true),
+    ]
+    expect(currentGoalPct(logs, 3, TODAY)).toBe(100)
+  })
+
+  it('meldet den Stand der laufenden Woche', () => {
+    expect(weekGoalProgress(inDieserWoche(['2026-07-06']), 3, TODAY)).toEqual({
+      done: 1,
+      target: 3,
+    })
+  })
+
+  it('Momentum steigt bei erfülltem Ziel und bleibt nicht im Keller', () => {
+    // 12 Wochen lang zweimal pro Woche
+    const logs: LogEntry[] = []
+    for (let w = 0; w < 12; w++) {
+      logs.push(mkLog(shiftKey(TODAY, -(w * 7)), true))
+      logs.push(mkLog(shiftKey(TODAY, -(w * 7 + 3)), true))
+    }
+    expect(currentGoalMomentum(logs, 2, TODAY)).toBeGreaterThan(90)
   })
 })

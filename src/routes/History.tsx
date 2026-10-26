@@ -10,7 +10,14 @@ import { HabitSwitcher } from '../components/HabitSwitcher'
 import { CalendarGrid, type DayInfo } from '../components/CalendarGrid'
 import { DaySheet } from '../components/DaySheet'
 import { WeekProgress } from '../components/WeekProgress'
-import { currentStreak, lastSevenDays, perfectWeekCount } from '../lib/metrics'
+import { JournalFeed } from '../components/JournalFeed'
+import {
+  currentStreak,
+  goalPerfectWeeks,
+  lastSevenDays,
+  perfectWeekCount,
+  weekGoalProgress,
+} from '../lib/metrics'
 
 function LegendDot({ className, label }: { className: string; label: string }) {
   return (
@@ -37,12 +44,22 @@ export function History() {
   )
   const [month, setMonth] = useState(() => new Date())
   const [sheetDate, setSheetDate] = useState<string | null>(null)
+  const [view, setView] = useState<'kalender' | 'notizen'>('kalender')
+  const ziel = selected?.target_per_week ?? null
 
   const dayInfo = useMemo(() => {
     const m = new Map<string, DayInfo>()
     for (const l of logs ?? []) {
       m.set(l.date, {
-        state: !l.rated ? 'open' : l.special ? 'special' : l.on_track ? 'on' : 'off',
+        state: !l.rated
+          ? 'open'
+          : l.paused
+            ? 'paused'
+            : l.special
+              ? 'special'
+              : l.on_track
+                ? 'on'
+                : 'off',
         hasNote: l.note !== null && l.note !== '',
         severity: l.severity ?? undefined,
       })
@@ -56,6 +73,24 @@ export function History() {
     <div>
       <PageTitle title={copy.tabs.history} />
       <HabitSwitcher habits={habits} value={selected?.id} onChange={setHabitId} />
+      <div className="mb-3 flex gap-2">
+        {(['kalender', 'notizen'] as const).map((key) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setView(key)}
+            className={`flex-1 rounded-full border px-3 py-1.5 text-sm transition ${
+              view === key ? 'border-ink bg-ink text-card' : 'border-line bg-card text-soft'
+            }`}
+          >
+            {key === 'kalender' ? copy.history.viewCalendar : copy.history.viewJournal}
+          </button>
+        ))}
+      </div>
+      {view === 'notizen' ? (
+        <JournalFeed logs={logs ?? []} />
+      ) : (
+        <>
       <Card>
         <div className="mb-3 flex items-center justify-between">
           <button
@@ -87,6 +122,7 @@ export function History() {
           <LegendDot className="border border-special/30 bg-special-soft" label={copy.history.legendSpecial} />
           <LegendDot className="border border-line bg-card" label={copy.history.legendNone} />
           <LegendDot className="border border-dashed border-faint bg-card" label={copy.history.legendOpen} />
+          <LegendDot className="border border-rest/30 bg-rest-soft" label={copy.history.legendPaused} />
           <span className="inline-flex items-center gap-1.5">
             <svg className="h-2.5 w-2.5 text-faint" viewBox="0 0 24 24" fill="currentColor">
               <path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1Z" />
@@ -98,10 +134,24 @@ export function History() {
       <Card className="mt-3">
         <WeekProgress
           days={lastSevenDays(logs ?? [])}
-          streak={currentStreak(logs ?? [])}
-          perfectWeeks={perfectWeekCount(logs ?? [])}
+          headline={
+            ziel === null
+              ? copy.today.streak(currentStreak(logs ?? []))
+              : copy.today.goalProgress(
+                  weekGoalProgress(logs ?? [], ziel).done,
+                  weekGoalProgress(logs ?? [], ziel).target,
+                )
+          }
+          perfectWeeks={
+            ziel === null ? perfectWeekCount(logs ?? []) : goalPerfectWeeks(logs ?? [], ziel)
+          }
+          goalLabel={
+            ziel === null ? copy.today.perfectWeekGoal : copy.today.perfectWeekGoalTarget(ziel)
+          }
         />
       </Card>
+        </>
+      )}
       {sheetDate && selected && (
         <DaySheet habit={selected} date={sheetDate} onClose={() => setSheetDate(null)} />
       )}

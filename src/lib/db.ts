@@ -1,7 +1,16 @@
 import Dexie, { type EntityTable } from 'dexie'
 import { DEFAULT_TAGS, RETIRED_DEFAULT_TAGS } from './config'
 import { nowIso } from './dates'
-import type { Habit, LogEntry, MetaRow, OutboxRow, Severity, SyncTable, Tag } from './types'
+import type {
+  Habit,
+  LogEntry,
+  MetaRow,
+  OutboxRow,
+  PromptDeck,
+  Severity,
+  SyncTable,
+  Tag,
+} from './types'
 
 class BounceBackDB extends Dexie {
   habits!: EntityTable<Habit, 'id'>
@@ -120,6 +129,31 @@ db.version(4)
     }
   })
 
+// v5: logs.paused (verletzt/krank) + habits.target_per_week / prompt_deck
+db.version(5)
+  .stores({
+    habits: 'id, updated_at',
+    logs: 'id, [habit_id+date], habit_id, updated_at',
+    tags: 'id, label, updated_at',
+    outbox: '++seq, row_id',
+    meta: 'key',
+  })
+  .upgrade(async (tx) => {
+    await tx
+      .table('logs')
+      .toCollection()
+      .modify((l) => {
+        if (l.paused === undefined) l.paused = false
+      })
+    await tx
+      .table('habits')
+      .toCollection()
+      .modify((h) => {
+        if (h.target_per_week === undefined) h.target_per_week = null
+        if (h.prompt_deck === undefined) h.prompt_deck = null
+      })
+  })
+
 db.on('populate', (tx) => {
   void tx.table('tags').bulkAdd(buildDefaultTagRows())
 })
@@ -153,11 +187,24 @@ async function enqueue(table: SyncTable, op: 'upsert' | 'delete', rowId: string)
   await db.outbox.add({ table, op, row_id: rowId })
 }
 
-export async function addHabit(name: string, logSameDay = false): Promise<string> {
+export async function addHabit(
+  name: string,
+  logSameDay = false,
+  targetPerWeek: number | null = null,
+  promptDeck: PromptDeck | null = null,
+): Promise<string> {
   const id = crypto.randomUUID()
   const t = nowIso()
   await db.transaction('rw', db.habits, db.outbox, async () => {
-    await db.habits.add({ id, name: name.trim(), log_same_day: logSameDay, created_at: t, updated_at: t })
+    await db.habits.add({
+      id,
+      name: name.trim(),
+      log_same_day: logSameDay,
+      target_per_week: targetPerWeek,
+      prompt_deck: promptDeck,
+      created_at: t,
+      updated_at: t,
+    })
     await enqueue('habits', 'upsert', id)
   })
   return id
@@ -166,6 +213,22 @@ export async function addHabit(name: string, logSameDay = false): Promise<string
 export async function setHabitLogMode(id: string, logSameDay: boolean): Promise<void> {
   await db.transaction('rw', db.habits, db.outbox, async () => {
     await db.habits.update(id, { log_same_day: logSameDay, updated_at: nowIso() })
+    await enqueue('habits', 'upsert', id)
+  })
+}
+
+/** Wochenziel setzen (`n`-mal pro Woche) oder mit null zurück auf täglich. */
+export async function setHabitTarget(id: string, targetPerWeek: number | null): Promise<void> {
+  await db.transaction('rw', db.habits, db.outbox, async () => {
+    await db.habits.update(id, { target_per_week: targetPerWeek, updated_at: nowIso() })
+    await enqueue('habits', 'upsert', id)
+  })
+}
+
+/** Tagesimpuls an- oder abschalten. */
+export async function setHabitPromptDeck(id: string, deck: PromptDeck | null): Promise<void> {
+  await db.transaction('rw', db.habits, db.outbox, async () => {
+    await db.habits.update(id, { prompt_deck: deck, updated_at: nowIso() })
     await enqueue('habits', 'upsert', id)
   })
 }
@@ -189,7 +252,13 @@ export async function setLogState(habitId: string, date: string, onTrack: boolea
     if (existing) {
       // Ein vorher nur notierter Tag (Urge) wird hier zum bewerteten Tag —
       // Notiz und Trigger von damals bleiben dabei erhalten.
-      await db.logs.update(existing.id, { rated: true, on_track: onTrack, special: false, updated_at: t })
+      await db.logs.update(existing.id, {
+        rated: true,
+        on_track: onTrack,
+        special: false,
+        paused: false,
+        updated_at: t,
+      })
       await enqueue('logs', 'upsert', existing.id)
     } else {
       const id = crypto.randomUUID()
@@ -200,6 +269,7 @@ export async function setLogState(habitId: string, date: string, onTrack: boolea
         rated: true,
         on_track: onTrack,
         special: false,
+        paused: false,
         severity: null,
         trigger_tags: [],
         note: null,
@@ -228,7 +298,13 @@ export async function setLogSpecial(habitId: string, date: string): Promise<void
     const existing = await db.logs.where('[habit_id+date]').equals([habitId, date]).first()
     const t = nowIso()
     if (existing) {
-      await db.logs.update(existing.id, { rated: true, on_track: true, special: true, updated_at: t })
+      await db.logs.update(existing.id, {
+        rated: true,
+        on_track: true,
+        special: true,
+        paused: false,
+        updated_at: t,
+      })
       await enqueue('logs', 'upsert', existing.id)
     } else {
       const id = crypto.randomUUID()
@@ -239,6 +315,7 @@ export async function setLogSpecial(habitId: string, date: string): Promise<void
         rated: true,
         on_track: true,
         special: true,
+        paused: false,
         severity: null,
         trigger_tags: [],
         note: null,
@@ -269,6 +346,7 @@ export async function ensureLogRow(habitId: string, date: string): Promise<strin
       rated: false,
       on_track: false,
       special: false,
+      paused: false,
       severity: null,
       trigger_tags: [],
       note: null,
@@ -291,6 +369,55 @@ export async function dropEmptyUnratedLog(logId: string): Promise<void> {
     if (log.trigger_tags.length > 0 || (log.note ?? '') !== '') return
     await db.logs.delete(logId)
     await enqueue('logs', 'delete', logId)
+  })
+}
+
+/**
+ * Markiert (Habit, Tag) als Pause — verletzt, krank, konnte schlicht nicht.
+ * Erneutes Antippen nimmt die Markierung wieder weg und lässt den Tag leer.
+ */
+export async function toggleLogPaused(habitId: string, date: string): Promise<void> {
+  await db.transaction('rw', db.logs, db.outbox, async () => {
+    const existing = await db.logs.where('[habit_id+date]').equals([habitId, date]).first()
+    const t = nowIso()
+    if (existing?.paused) {
+      // Zurücknehmen: Notiz und Trigger behalten, sonst ganz weg
+      if (existing.trigger_tags.length > 0 || (existing.note ?? '') !== '') {
+        await db.logs.update(existing.id, { paused: false, rated: false, updated_at: t })
+        await enqueue('logs', 'upsert', existing.id)
+      } else {
+        await db.logs.delete(existing.id)
+        await enqueue('logs', 'delete', existing.id)
+      }
+      return
+    }
+    if (existing) {
+      await db.logs.update(existing.id, {
+        rated: true,
+        paused: true,
+        on_track: false,
+        special: false,
+        updated_at: t,
+      })
+      await enqueue('logs', 'upsert', existing.id)
+    } else {
+      const id = crypto.randomUUID()
+      await db.logs.add({
+        id,
+        habit_id: habitId,
+        date,
+        rated: true,
+        on_track: false,
+        special: false,
+        paused: true,
+        severity: null,
+        trigger_tags: [],
+        note: null,
+        created_at: t,
+        updated_at: t,
+      })
+      await enqueue('logs', 'upsert', id)
+    }
   })
 }
 

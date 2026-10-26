@@ -115,6 +115,7 @@ function normalize(table: SyncTable, raw: RemoteRow): Habit | Tag | LogEntry {
       date: raw.date as string,
       rated: (raw.rated as boolean | null) ?? true,
       on_track: raw.on_track as boolean,
+      paused: (raw.paused as boolean | null) ?? false,
       special: (raw.special as boolean | null) ?? false,
       severity: (raw.severity as LogEntry['severity']) ?? null,
       trigger_tags: (raw.trigger_tags as string[] | null) ?? [],
@@ -129,7 +130,13 @@ function normalize(table: SyncTable, raw: RemoteRow): Habit | Tag | LogEntry {
     updated_at: raw.updated_at as string,
   }
   return table === 'habits'
-    ? { ...base, name: raw.name as string, log_same_day: (raw.log_same_day as boolean | null) ?? false }
+    ? {
+        ...base,
+        name: raw.name as string,
+        log_same_day: (raw.log_same_day as boolean | null) ?? false,
+        target_per_week: (raw.target_per_week as number | null) ?? null,
+        prompt_deck: (raw.prompt_deck as Habit['prompt_deck'] | null) ?? null,
+      }
     : { ...base, label: raw.label as string }
 }
 

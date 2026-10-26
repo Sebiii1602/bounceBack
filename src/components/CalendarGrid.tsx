@@ -3,8 +3,8 @@ import { dateKey, todayKey } from '../lib/dates'
 import { WEEKDAYS_DE } from '../lib/metrics'
 
 export interface DayInfo {
-  /** `open` = nur notiert, noch nicht bewertet */
-  state: 'on' | 'off' | 'special' | 'open'
+  /** `open` = nur notiert, `paused` = verletzt/krank (zählt nirgends) */
+  state: 'on' | 'off' | 'special' | 'open' | 'paused'
   hasNote: boolean
   /** Stärke bei „nicht on track“ — färbt den Sand etwas heller/kräftiger */
   severity?: 1 | 2 | 3
@@ -53,6 +53,7 @@ export function CalendarGrid({
             info.severity === 1 ? 'bg-slip-soft/60' : info.severity === 3 ? 'bg-slip/40' : 'bg-slip-soft'
           cls = `${shade} font-medium text-slip-deep`
         } else if (info?.state === 'special') cls = 'bg-special-soft font-medium text-special-deep'
+        else if (info?.state === 'paused') cls = 'bg-rest-soft font-medium text-rest-deep'
         else if (info?.state === 'open') cls = 'border border-dashed border-faint/70 text-soft'
         else if (locked) cls = 'text-faint/50'
         else cls = 'border border-line/70 text-soft'
