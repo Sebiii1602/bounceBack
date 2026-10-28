@@ -1,6 +1,7 @@
 import { copy } from '../lib/copy'
 import { fmtDayLong } from '../lib/dates'
-import type { LogEntry } from '../lib/types'
+import { mayShowDetails, useRevealed } from '../lib/privacy'
+import type { Habit, LogEntry } from '../lib/types'
 import { Card } from './ui'
 
 /** Farbe des Punkts links — dieselbe Sprache wie Kalender und Wochenstreifen. */
@@ -16,7 +17,16 @@ function dotClass(log: LogEntry): string {
  * Notizen nur über den Kalender heran — Tag für Tag. Hier liest man sie als
  * das, was sie eigentlich sind: ein Tagebuch.
  */
-export function JournalFeed({ logs }: { logs: LogEntry[] }) {
+export function JournalFeed({ logs, habit }: { logs: LogEntry[]; habit: Habit | undefined }) {
+  const revealed = useRevealed()
+  // Notizen verraten oft mehr als der Name — bei verdecktem Habit bleibt alles zu
+  if (habit && !mayShowDetails(habit, revealed)) {
+    return (
+      <Card>
+        <p className="text-sm text-soft">{copy.today.hiddenDetails}</p>
+      </Card>
+    )
+  }
   const eintraege = logs
     .filter((l) => (l.note ?? '') !== '' || l.trigger_tags.length > 0)
     .sort((a, b) => b.date.localeCompare(a.date))

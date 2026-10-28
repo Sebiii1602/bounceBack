@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { addHabit, db } from '../lib/db'
+import { addHabit, db, sortHabits } from '../lib/db'
 import { copy } from '../lib/copy'
 import { fmtDayLong, todayKey } from '../lib/dates'
 import { Card, PageTitle } from '../components/ui'
@@ -46,7 +46,7 @@ function EmptyState() {
 
 export function Today() {
   const habits = useLiveQuery(
-    async () => (await db.habits.toArray()).sort((a, b) => a.created_at.localeCompare(b.created_at)),
+    async () => sortHabits(await db.habits.toArray()),
     [],
   )
   if (habits === undefined) return null

@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, setLogState, toggleLogPaused } from '../lib/db'
+import { db, endPause, pauseRange, setLogState } from '../lib/db'
 import { copy } from '../lib/copy'
-import { fmtDayLong, fmtDayShort, todayKey, yesterdayKey } from '../lib/dates'
+import { fmtDayLong, fmtDayShort, shiftKey, todayKey, yesterdayKey } from '../lib/dates'
 import {
   currentGoalMomentum,
   currentGoalPct,
@@ -11,6 +11,7 @@ import {
   currentStreak,
   goalPerfectWeeks,
   lastSevenDays,
+  pausedUntil,
   perfectWeekCount,
   weekGoalProgress,
 } from '../lib/metrics'
@@ -21,6 +22,7 @@ import { LogDetails } from './LogDetails'
 import { JournalPanel } from './JournalPanel'
 import { WeekProgress } from './WeekProgress'
 import { DailyPrompt, promptWasRead } from './DailyPrompt'
+import { displayName, mayShowDetails, useRevealed } from '../lib/privacy'
 
 const MedKitIcon = (
   <>
@@ -29,6 +31,49 @@ const MedKitIcon = (
     <path d="M12 11.5v4M10 13.5h4" />
   </>
 )
+
+/**
+ * Wie lange pausiert? Sechs Wochen Verletzung soll man einmal eintragen —
+ * nicht jeden Morgen erneut. „Bis Datum" nutzt den nativen Datumsdialog.
+ */
+function PausePicker({ onPick }: { onPick: (bis: string) => void }) {
+  const today = todayKey()
+  return (
+    <div className="mt-2 rounded-xl bg-paper p-3">
+      <p className="mb-2 text-xs text-faint">{copy.today.pauseFor}</p>
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => onPick(today)}
+          className="rounded-full border border-line bg-card px-3 py-1.5 text-sm text-soft"
+        >
+          {copy.today.pauseToday}
+        </button>
+        {[1, 2, 4, 6].map((wochen) => (
+          <button
+            key={wochen}
+            type="button"
+            onClick={() => onPick(shiftKey(today, wochen * 7 - 1))}
+            className="rounded-full border border-line bg-card px-3 py-1.5 text-sm text-soft"
+          >
+            {copy.today.pauseWeeks(wochen)}
+          </button>
+        ))}
+      </div>
+      <label className="mt-3 flex items-center gap-2 text-xs text-faint">
+        {copy.today.pauseUntilDate}
+        <input
+          type="date"
+          min={today}
+          onChange={(e) => {
+            if (e.target.value) onPick(e.target.value)
+          }}
+          className="rounded-lg border border-line bg-card px-2 py-1.5 text-sm text-ink outline-none"
+        />
+      </label>
+    </div>
+  )
+}
 
 export function HabitLogCard({ habit }: { habit: Habit }) {
   const target = habit.target_per_week
@@ -52,6 +97,9 @@ export function HabitLogCard({ habit }: { habit: Habit }) {
   const [promptRead, setPromptRead] = useState(() =>
     habit.prompt_deck ? promptWasRead(habit.id, day) : true,
   )
+  const [pausePanel, setPausePanel] = useState(false)
+  const revealed = useRevealed()
+  const zeigeDetails = mayShowDetails(habit, revealed)
 
   const alle = logs ?? []
   const pct = isGoal
@@ -64,7 +112,9 @@ export function HabitLogCard({ habit }: { habit: Habit }) {
   const perfect = isGoal ? goalPerfectWeeks(alle, target) : perfectWeekCount(alle)
   const wochenstand = isGoal ? weekGoalProgress(alle, target, today) : null
   const hasJournal = !!todayLog && (todayLog.trigger_tags.length > 0 || (todayLog.note ?? '') !== '')
-  const carried = log && !log.rated && (log.trigger_tags.length > 0 || (log.note ?? '') !== '')
+  const carried =
+    zeigeDetails && log && !log.rated && (log.trigger_tags.length > 0 || (log.note ?? '') !== '')
+  const pauseBis = pausedUntil(alle, today)
   // Tagesimpuls nicht gelesen → erst lesen, dann abhaken
   const gesperrt = habit.prompt_deck !== null && !promptRead
 
@@ -83,7 +133,7 @@ export function HabitLogCard({ habit }: { habit: Habit }) {
   return (
     <Card>
       <div className="flex items-baseline justify-between gap-2">
-        <h2 className="text-base font-semibold">{habit.name}</h2>
+        <h2 className="text-base font-semibold">{displayName(habit, revealed)}</h2>
         <span className="shrink-0 text-xs text-faint">
           {isGoal
             ? copy.today.goalStat(pct === null ? '–' : `${pct} %`, momentum)
@@ -117,13 +167,17 @@ export function HabitLogCard({ habit }: { habit: Habit }) {
       )}
       <div className="mt-3">
         {tab === 'journal' && !sameDay ? (
-          <JournalPanel habit={habit} date={today} />
+          zeigeDetails ? (
+            <JournalPanel habit={habit} date={today} />
+          ) : (
+            <p className="text-sm text-soft">{copy.today.hiddenDetails}</p>
+          )
         ) : (
           <>
             {!sameDay && (
               <p className="mb-2 text-xs text-faint">{copy.today.targetYesterday(fmtDayLong(day))}</p>
             )}
-            {habit.prompt_deck && (
+            {habit.prompt_deck && zeigeDetails && (
               <div className="mb-3">
                 <DailyPrompt
                   habitId={habit.id}
@@ -140,7 +194,20 @@ export function HabitLogCard({ habit }: { habit: Habit }) {
                 )}
               </p>
             )}
-            {log && log.rated && !editing ? (
+            {pauseBis !== null && !editing ? (
+              <div className="rounded-xl bg-rest-soft px-3.5 py-3">
+                <p className="text-sm font-medium text-rest-deep">
+                  {copy.today.pauseActive(fmtDayLong(pauseBis))}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void endPause(habit.id, today)}
+                  className="mt-1 text-sm font-medium text-rest-deep underline underline-offset-2"
+                >
+                  {copy.today.pauseEnd}
+                </button>
+              </div>
+            ) : log && log.rated && !editing ? (
               <div className="flex items-center justify-between gap-2">
                 <p className="text-sm text-soft">
                   {log.paused
@@ -175,25 +242,31 @@ export function HabitLogCard({ habit }: { habit: Habit }) {
                   />
                 )}
                 {sameDay && (
-                  <button
-                    type="button"
-                    onClick={() => void toggleLogPaused(habit.id, day)}
-                    className={`mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl border py-3 text-[15px] font-medium transition active:scale-[0.98] ${
-                      log?.paused
-                        ? 'border-rest bg-rest text-white'
-                        : 'border-rest/25 bg-rest-soft text-rest-deep'
-                    }`}
-                  >
-                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      {MedKitIcon}
-                    </svg>
-                    {copy.today.paused}
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setPausePanel((v) => !v)}
+                      className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-rest/25 bg-rest-soft py-3 text-[15px] font-medium text-rest-deep transition active:scale-[0.98]"
+                    >
+                      <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        {MedKitIcon}
+                      </svg>
+                      {copy.today.paused}
+                    </button>
+                    {pausePanel && (
+                      <PausePicker
+                        onPick={(bis) => {
+                          void pauseRange(habit.id, today, bis)
+                          setPausePanel(false)
+                        }}
+                      />
+                    )}
+                  </>
                 )}
               </div>
             )}
             {gesperrt && <p className="mt-2 text-xs text-faint">{copy.today.promptLocked}</p>}
-            {log?.rated && !log.on_track && !log.paused && panelOpen && (
+            {log?.rated && !log.on_track && !log.paused && panelOpen && zeigeDetails && (
               <LogDetails log={log} onDone={() => setPanelOpen(false)} />
             )}
           </>

@@ -9,8 +9,11 @@ import {
   renameTag,
   setHabitLogMode,
   setHabitPromptDeck,
+  setHabitAlias,
   setHabitTarget,
+  sortHabits,
   sortTags,
+  moveHabit,
 } from '../lib/db'
 import { copy } from '../lib/copy'
 import { APP_BUILD } from '../lib/config'
@@ -29,6 +32,7 @@ import { Card, SectionLabel, PageTitle } from '../components/ui'
 import { LogModeChips } from '../components/LogModeChips'
 import { HabitSwitcher } from '../components/HabitSwitcher'
 import { ALL_DECKS, DECK_LABEL } from '../lib/prompts'
+import { displayName, useRevealed } from '../lib/privacy'
 import type { Habit, PromptDeck } from '../lib/types'
 
 const WEEK_TARGETS = [null, 1, 2, 3, 4, 5] as const
@@ -52,6 +56,38 @@ function Chip({
     >
       {children}
     </button>
+  )
+}
+
+/** Deckname mit Speichern-Knopf — leeres Feld hebt „privat" wieder auf. */
+function AliasField({ habit }: { habit: Habit }) {
+  const [draft, setDraft] = useState(habit.private_alias ?? '')
+  useEffect(() => {
+    setDraft(habit.private_alias ?? '')
+  }, [habit.id, habit.private_alias])
+  const geaendert = draft.trim() !== (habit.private_alias ?? '')
+  return (
+    <form
+      className="flex gap-2"
+      onSubmit={(e) => {
+        e.preventDefault()
+        void setHabitAlias(habit.id, draft)
+      }}
+    >
+      <input
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        placeholder={copy.more.aliasPlaceholder}
+        className="min-w-0 flex-1 rounded-lg border border-line bg-paper px-3 py-1.5 text-base outline-none focus:border-track"
+      />
+      <button
+        type="submit"
+        disabled={!geaendert}
+        className="shrink-0 rounded-lg bg-ink px-3 py-1.5 text-sm font-medium text-card disabled:opacity-40"
+      >
+        {copy.common.save}
+      </button>
+    </form>
   )
 }
 
@@ -98,6 +134,10 @@ function HabitOptions({ habits }: { habits: Habit[] }) {
           <p className="mt-2 text-xs text-faint">{copy.today.modeHint}</p>
         </>
       )}
+
+      <p className="mb-2 mt-4 text-xs text-faint">{copy.more.aliasLabel}</p>
+      <AliasField habit={habit} />
+      <p className="mt-2 text-xs text-faint">{copy.more.aliasHint}</p>
 
       <p className="mb-2 mt-4 text-xs text-faint">{copy.more.promptLabel}</p>
       <div className="flex flex-wrap gap-2">
@@ -275,6 +315,8 @@ const TrashIcon = (
 interface NamedItem {
   id: string
   label: string
+  /** Beim Umbenennen vorbelegter Wert — bei verdeckten Habits der echte Name. */
+  editLabel?: string
 }
 
 function NameList({
@@ -335,7 +377,7 @@ function NameList({
                   label={copy.common.rename}
                   onClick={() => {
                     setEditId(item.id)
-                    setEditVal(item.label)
+                    setEditVal(item.editLabel ?? item.label)
                   }}
                 >
                   {PencilIcon}
@@ -435,7 +477,7 @@ function SyncCard() {
 
 export function More() {
   const habits = useLiveQuery(
-    async () => (await db.habits.toArray()).sort((a, b) => a.created_at.localeCompare(b.created_at)),
+    async () => sortHabits(await db.habits.toArray()),
     [],
   )
   const tags = useLiveQuery(
@@ -444,6 +486,7 @@ export function More() {
   )
   const { cloud, session, signOut } = useAuth()
   const [newSameDay, setNewSameDay] = useState(false)
+  const revealed = useRevealed()
 
   async function removeHabit(id: string) {
     try {
@@ -467,12 +510,37 @@ export function More() {
       <Card>
         <SectionLabel>{copy.more.habits}</SectionLabel>
         <NameList
-          items={(habits ?? []).map((h) => ({ id: h.id, label: h.name }))}
+          items={(habits ?? []).map((h) => ({
+            id: h.id,
+            label: displayName(h, revealed),
+            editLabel: h.name,
+          }))}
           addPlaceholder={copy.more.addHabit}
           onAdd={(name) => addHabit(name, newSameDay)}
           onRename={renameHabit}
           onDelete={removeHabit}
           confirmMsg={copy.more.deleteHabitConfirm}
+          renderMeta={(item) => {
+            const liste = habits ?? []
+            const i = liste.findIndex((h) => h.id === item.id)
+            if (i === -1 || liste.length < 2) return null
+            return (
+              <>
+                <IconButton
+                  label={copy.more.moveUp}
+                  onClick={() => void (i > 0 && moveHabit(item.id, -1))}
+                >
+                  <path d="m6 14 6-6 6 6" />
+                </IconButton>
+                <IconButton
+                  label={copy.more.moveDown}
+                  onClick={() => void (i < liste.length - 1 && moveHabit(item.id, 1))}
+                >
+                  <path d="m6 10 6 6 6-6" />
+                </IconButton>
+              </>
+            )
+          }}
           addExtra={<LogModeChips value={newSameDay} onChange={setNewSameDay} />}
         />
       </Card>

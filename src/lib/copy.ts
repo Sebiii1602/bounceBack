@@ -21,6 +21,8 @@ export const copy = {
     delete: 'Löschen',
     rename: 'Umbenennen',
     loading: 'Lädt…',
+    showPrivate: 'Private Habits aufdecken',
+    hidePrivate: 'Private Habits verdecken',
   },
 
   today: {
@@ -60,8 +62,16 @@ export const copy = {
     promptTitle: 'Heute lesen',
     promptListen: 'Vorlesen',
     promptReveal: 'Übersetzung',
+    promptHide: 'Übersetzung ausblenden',
     promptLocked: 'Lies den Text, dann kannst du abhaken.',
     paused: 'Pausiert',
+    hiddenDetails: 'Verdeckt — tippe oben rechts aufs Auge, um aufzudecken.',
+    pauseFor: 'Wie lange?',
+    pauseToday: 'Nur heute',
+    pauseWeeks: (n: number) => (n === 1 ? '1 Woche' : `${n} Wochen`),
+    pauseUntilDate: 'Bis Datum',
+    pauseActive: (bis: string) => `Pausiert bis ${bis}`,
+    pauseEnd: 'Pause beenden',
     pausedHint: 'Verletzt oder krank? Der Tag zählt dann nirgends mit und bricht deine Serie nicht ab.',
     loggedPaused: (day: string) => `Eingetragen: ${day} — pausiert`,
     goalDone: 'Gemacht',
@@ -123,6 +133,12 @@ export const copy = {
     targetHintGoal:
       'Du trägst nur ein, was stattgefunden hat. Tage ohne Eintrag sind kein Fehler, sondern einfach keine Trainingstage.',
     modeLabel: 'Wann eintragen?',
+    aliasLabel: 'Deckname (privat)',
+    aliasPlaceholder: 'z. B. Abends',
+    aliasHint:
+      'Mit Deckname gilt der Habit als privat: Er zeigt normalerweise diesen Namen, Notizen und Trigger bleiben verborgen. Das Auge oben rechts deckt für die laufende Sitzung auf. Leer lassen = nicht privat.',
+    moveUp: 'Nach oben',
+    moveDown: 'Nach unten',
     promptLabel: 'Tagesimpuls',
     promptNone: 'Keiner',
     promptHint: 'Ein kurzer Text beim Öffnen — vorlesbar, mit Übersetzung zum Aufdecken.',

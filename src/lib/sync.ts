@@ -136,6 +136,8 @@ function normalize(table: SyncTable, raw: RemoteRow): Habit | Tag | LogEntry {
         log_same_day: (raw.log_same_day as boolean | null) ?? false,
         target_per_week: (raw.target_per_week as number | null) ?? null,
         prompt_deck: (raw.prompt_deck as Habit['prompt_deck'] | null) ?? null,
+        private_alias: (raw.private_alias as string | null) ?? null,
+        sort_order: (raw.sort_order as number | null) ?? 0,
       }
     : { ...base, label: raw.label as string }
 }

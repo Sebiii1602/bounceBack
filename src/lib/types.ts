@@ -14,6 +14,15 @@ export interface Habit {
    * italienischer Absatz). null = keiner.
    */
   prompt_deck: PromptDeck | null
+  /**
+   * Deckname für den Diskret-Modus. Ist er gesetzt, gilt der Habit als privat
+   * und zeigt verdeckt diesen Namen statt des echten — bewusst ein harmloser
+   * Name statt Punkten oder Weichzeichner: Zensur zieht Blicke an, Langeweile
+   * nicht. Notizen und Trigger sind verdeckt ebenfalls ausgeblendet.
+   */
+  private_alias: string | null
+  /** Reihenfolge in allen Listen; kleiner zuerst. */
+  sort_order: number
   created_at: string
   updated_at: string
 }

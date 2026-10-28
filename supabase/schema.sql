@@ -11,6 +11,10 @@ create table if not exists public.habits (
   target_per_week smallint check (target_per_week is null or target_per_week between 1 and 7),
   -- Tagesimpuls beim Öffnen (z. B. 'italienisch')
   prompt_deck text,
+  -- Deckname für den Diskret-Modus (gesetzt = privat)
+  private_alias text,
+  -- Reihenfolge in den Listen
+  sort_order integer not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

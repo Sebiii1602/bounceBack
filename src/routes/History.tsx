@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { addMonths } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db } from '../lib/db'
+import { db, sortHabits } from '../lib/db'
 import { copy } from '../lib/copy'
 import { fmtMonth } from '../lib/dates'
 import type { LogEntry } from '../lib/types'
@@ -30,7 +30,7 @@ function LegendDot({ className, label }: { className: string; label: string }) {
 
 export function History() {
   const habits = useLiveQuery(
-    async () => (await db.habits.toArray()).sort((a, b) => a.created_at.localeCompare(b.created_at)),
+    async () => sortHabits(await db.habits.toArray()),
     [],
   )
   const [habitId, setHabitId] = useState<string | null>(null)
@@ -88,7 +88,7 @@ export function History() {
         ))}
       </div>
       {view === 'notizen' ? (
-        <JournalFeed logs={logs ?? []} />
+        <JournalFeed logs={logs ?? []} habit={selected} />
       ) : (
         <>
       <Card>

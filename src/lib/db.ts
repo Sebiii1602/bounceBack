@@ -1,6 +1,6 @@
 import Dexie, { type EntityTable } from 'dexie'
 import { DEFAULT_TAGS, RETIRED_DEFAULT_TAGS } from './config'
-import { nowIso } from './dates'
+import { nowIso, shiftKey } from './dates'
 import type {
   Habit,
   LogEntry,
@@ -52,6 +52,41 @@ db.version(2)
 function buildDefaultTagRows(): Tag[] {
   const t = nowIso()
   return DEFAULT_TAGS.map((label) => ({ id: crypto.randomUUID(), label, created_at: t, updated_at: t }))
+}
+
+/** Anzeige-Reihenfolge der Habits: selbst gewählt, sonst nach Anlagedatum. */
+export function sortHabits(habits: Habit[]): Habit[] {
+  return [...habits].sort(
+    (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.created_at.localeCompare(b.created_at),
+  )
+}
+
+/** Schiebt einen Habit in der Liste um eine Position nach oben oder unten. */
+export async function moveHabit(id: string, richtung: -1 | 1): Promise<void> {
+  await db.transaction('rw', db.habits, db.outbox, async () => {
+    const sortiert = sortHabits(await db.habits.toArray())
+    const i = sortiert.findIndex((h) => h.id === id)
+    const j = i + richtung
+    if (i === -1 || j < 0 || j >= sortiert.length) return
+    const t = nowIso()
+    // Beide Nachbarn neu nummerieren, damit die Reihenfolge lückenlos bleibt
+    await db.habits.update(sortiert[i]!.id, { sort_order: j, updated_at: t })
+    await db.habits.update(sortiert[j]!.id, { sort_order: i, updated_at: t })
+    await enqueue('habits', 'upsert', sortiert[i]!.id)
+    await enqueue('habits', 'upsert', sortiert[j]!.id)
+  })
+}
+
+/** Deckname setzen (macht den Habit privat) oder mit null wieder aufdecken. */
+export async function setHabitAlias(id: string, alias: string | null): Promise<void> {
+  const sauber = alias?.trim()
+  await db.transaction('rw', db.habits, db.outbox, async () => {
+    await db.habits.update(id, {
+      private_alias: sauber === undefined || sauber === '' ? null : sauber,
+      updated_at: nowIso(),
+    })
+    await enqueue('habits', 'upsert', id)
+  })
 }
 
 /**
@@ -154,6 +189,26 @@ db.version(5)
       })
   })
 
+// v6: habits.private_alias (Diskret-Modus) + habits.sort_order
+db.version(6)
+  .stores({
+    habits: 'id, updated_at',
+    logs: 'id, [habit_id+date], habit_id, updated_at',
+    tags: 'id, label, updated_at',
+    outbox: '++seq, row_id',
+    meta: 'key',
+  })
+  .upgrade(async (tx) => {
+    const habits = (await tx.table('habits').toArray()) as Habit[]
+    const reihenfolge = [...habits].sort((a, b) => a.created_at.localeCompare(b.created_at))
+    for (let i = 0; i < reihenfolge.length; i++) {
+      await tx.table('habits').update(reihenfolge[i]!.id, {
+        private_alias: reihenfolge[i]!.private_alias ?? null,
+        sort_order: i,
+      })
+    }
+  })
+
 db.on('populate', (tx) => {
   void tx.table('tags').bulkAdd(buildDefaultTagRows())
 })
@@ -202,6 +257,8 @@ export async function addHabit(
       log_same_day: logSameDay,
       target_per_week: targetPerWeek,
       prompt_deck: promptDeck,
+      private_alias: null,
+      sort_order: await db.habits.count(),
       created_at: t,
       updated_at: t,
     })
@@ -417,6 +474,71 @@ export async function toggleLogPaused(habitId: string, date: string): Promise<vo
         updated_at: t,
       })
       await enqueue('logs', 'upsert', id)
+    }
+  })
+}
+
+/**
+ * Pausiert einen ganzen Zeitraum am Stück — sechs Wochen verletzt soll man
+ * einmal eintragen und dann Ruhe haben, nicht jeden Morgen erneut antippen.
+ * Trägt auch in die Zukunft ein; die Metriken rechnen ohnehin nur bis heute.
+ * Vorhandene Bewertungen in dem Zeitraum bleiben unangetastet.
+ */
+export async function pauseRange(habitId: string, from: string, to: string): Promise<void> {
+  await db.transaction('rw', db.logs, db.outbox, async () => {
+    const t = nowIso()
+    for (let d = from; d <= to; d = shiftKey(d, 1)) {
+      const existing = await db.logs.where('[habit_id+date]').equals([habitId, d]).first()
+      if (existing?.rated && !existing.paused) continue // bereits bewertet: nicht überschreiben
+      if (existing) {
+        await db.logs.update(existing.id, {
+          rated: true,
+          paused: true,
+          on_track: false,
+          special: false,
+          updated_at: t,
+        })
+        await enqueue('logs', 'upsert', existing.id)
+      } else {
+        const id = crypto.randomUUID()
+        await db.logs.add({
+          id,
+          habit_id: habitId,
+          date: d,
+          rated: true,
+          on_track: false,
+          special: false,
+          paused: true,
+          severity: null,
+          trigger_tags: [],
+          note: null,
+          created_at: t,
+          updated_at: t,
+        })
+        await enqueue('logs', 'upsert', id)
+      }
+    }
+  })
+}
+
+/**
+ * Beendet eine laufende Pause ab `from`: löscht die Pausentage von dort an,
+ * behält die davor. Wer früher wieder fit ist, soll nicht 40 Tage einzeln
+ * aufräumen müssen — die dokumentierte Vergangenheit bleibt aber stehen.
+ */
+export async function endPause(habitId: string, from: string): Promise<void> {
+  await db.transaction('rw', db.logs, db.outbox, async () => {
+    const alle = await db.logs.where('habit_id').equals(habitId).toArray()
+    for (const log of alle) {
+      if (!log.paused || log.date < from) continue
+      if (log.trigger_tags.length > 0 || (log.note ?? '') !== '') {
+        // Notiz behalten, nur die Pausen-Markierung nehmen
+        await db.logs.update(log.id, { paused: false, rated: false, updated_at: nowIso() })
+        await enqueue('logs', 'upsert', log.id)
+      } else {
+        await db.logs.delete(log.id)
+        await enqueue('logs', 'delete', log.id)
+      }
     }
   })
 }

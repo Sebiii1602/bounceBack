@@ -233,6 +233,23 @@ export function currentStreak(logs: LogEntry[], today = todayKey()): number {
   }
 }
 
+/**
+ * Läuft gerade eine Pause? Gibt den letzten Tag der zusammenhängenden
+ * Pausenstrecke ab `today` zurück, sonst null. Bewusst aus den Pausentagen
+ * abgeleitet statt als eigenes Feld gespeichert — so kann es gar nicht erst
+ * auseinanderlaufen.
+ */
+export function pausedUntil(logs: LogEntry[], today = todayKey()): string | null {
+  const map = logMap(logs)
+  if (map.get(today)?.kind !== 'paused') return null
+  let date = today
+  for (;;) {
+    const next = shiftKey(date, 1)
+    if (map.get(next)?.kind !== 'paused') return date
+    date = next
+  }
+}
+
 /** Die letzten sieben Kalendertage bis heute, ältester zuerst. */
 export function lastSevenDays(logs: LogEntry[], today = todayKey()): DayState[] {
   const map = logMap(logs)

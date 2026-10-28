@@ -32,17 +32,21 @@ export function DailyPrompt({
   onRead: () => void
 }) {
   const text = promptForDay(deck, date)
-  const [revealed, setRevealed] = useState(() => promptWasRead(habitId, date))
+  // Zwei getrennte Dinge: einmal gelesen schaltet das Abhaken dauerhaft frei,
+  // sichtbar ist die Übersetzung aber frei umschaltbar — zum Selbstabfragen.
+  const [showing, setShowing] = useState(() => promptWasRead(habitId, date))
 
   useEffect(() => {
-    setRevealed(promptWasRead(habitId, date))
+    setShowing(promptWasRead(habitId, date))
   }, [habitId, date])
 
   // Beim Verlassen nicht weiterreden
   useEffect(() => stopSpeaking, [])
 
-  function reveal() {
-    setRevealed(true)
+  function toggle() {
+    const next = !showing
+    setShowing(next)
+    if (!next) return
     try {
       localStorage.setItem(readKey(habitId, date), '1')
     } catch {
@@ -69,17 +73,17 @@ export function DailyPrompt({
             {copy.today.promptListen}
           </button>
         )}
-        {!revealed && (
-          <button
-            type="button"
-            onClick={reveal}
-            className="rounded-full bg-ink px-3 py-1.5 text-sm font-medium text-card transition active:scale-[0.98]"
-          >
-            {copy.today.promptReveal}
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={toggle}
+          className={`rounded-full px-3 py-1.5 text-sm font-medium transition active:scale-[0.98] ${
+            showing ? 'border border-line bg-card text-soft' : 'bg-ink text-card'
+          }`}
+        >
+          {showing ? copy.today.promptHide : copy.today.promptReveal}
+        </button>
       </div>
-      {revealed && (
+      {showing && (
         <p className="mt-3 border-t border-line pt-3 text-sm leading-relaxed text-soft">
           {text.de}
         </p>

@@ -1,3 +1,4 @@
+import { displayName, useRevealed } from '../lib/privacy'
 import type { Habit } from '../lib/types'
 
 /** Chips zum Umschalten zwischen Habits — erscheint erst ab zwei Habits. */
@@ -10,6 +11,7 @@ export function HabitSwitcher({
   value: string | undefined
   onChange: (id: string) => void
 }) {
+  const revealed = useRevealed()
   if (habits.length <= 1) return null
   return (
     <div className="mb-4 flex flex-wrap gap-2">
@@ -22,7 +24,7 @@ export function HabitSwitcher({
             habit.id === value ? 'border-ink bg-ink text-card' : 'border-line bg-card text-soft'
           }`}
         >
-          {habit.name}
+          {displayName(habit, revealed)}
         </button>
       ))}
     </div>
