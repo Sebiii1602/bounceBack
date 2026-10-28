@@ -2,6 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { MOMENTUM } from './config'
 import {
   currentMomentum,
+  goalPeriodPct,
+  momentumAsRate,
+  momentumChange,
+  momentumSeriesFor,
+  monthReview,
+  periodPct,
+  previousPeriodPct,
   currentRollingPct,
   momentumSeries,
   rollingSeries,
@@ -472,5 +479,146 @@ describe('Ziel-Habits (n-mal pro Woche)', () => {
       logs.push(mkLog(shiftKey(TODAY, -(w * 7 + 3)), true))
     }
     expect(currentGoalMomentum(logs, 2, TODAY)).toBeGreaterThan(90)
+  })
+})
+
+describe('periodPct', () => {
+  it('folgt dem gewählten Zeitraum statt immer 30 Tage zu nehmen', () => {
+    // 60 Tage: die ersten 30 alle on track, die letzten 30 alle daneben
+    const logs = Array.from({ length: 60 }, (_, i) =>
+      mkLog(shiftKey(TODAY, i - 59), i < 30),
+    )
+    expect(periodPct(logs, null, 30, TODAY)).toBe(0)
+    expect(periodPct(logs, null, 60, TODAY)).toBe(50)
+  })
+
+  it('vergleicht mit dem gleich langen Zeitraum davor', () => {
+    const logs = Array.from({ length: 60 }, (_, i) =>
+      mkLog(shiftKey(TODAY, i - 59), i < 30),
+    )
+    expect(previousPeriodPct(logs, null, 30, TODAY)).toBe(100)
+  })
+
+  it('gibt null zurück, solange der Zeitraum leer ist', () => {
+    expect(periodPct([], null, 30, TODAY)).toBe(null)
+  })
+
+  it('rechnet Ziel-Habits gegen das Soll, nicht gegen die Tage', () => {
+    // 2x pro Woche, 28 Tage, genau 8 Termine → Soll ist 8 → 100 %
+    const tage = [0, 3, 7, 10, 14, 17, 21, 24].map((i) => mkLog(shiftKey(TODAY, i - 27), true))
+    expect(goalPeriodPct(tage, 2, 28, TODAY)).toBe(100)
+    // Dieselben Termine bei Ziel 4 reichen nur für die Hälfte
+    expect(goalPeriodPct(tage, 4, 28, TODAY)).toBe(50)
+  })
+
+  it('kürzt das Soll um Pausentage', () => {
+    const logs = [
+      ...[0, 3, 7, 10].map((i) => mkLog(shiftKey(TODAY, i - 27), true)),
+      ...Array.from({ length: 14 }, (_, i) => mkPause(shiftKey(TODAY, i - 13))),
+    ]
+    // Halbe Zeit verletzt → halbes Soll (2x in 14 nutzbaren Tagen = 4) → erfüllt
+    expect(goalPeriodPct(logs, 2, 28, TODAY)).toBe(100)
+  })
+})
+
+describe('momentumChange / momentumAsRate', () => {
+  it('nennt die Bewegung der letzten sieben Tage', () => {
+    // 20 Tage on track: der Wert klettert noch, ist also nicht schon bei 100
+    const series = momentumSeriesFor(mkQuote(20, 1), null, TODAY)
+    const delta = momentumChange(series, 7)
+    expect(delta).not.toBe(null)
+    expect(delta!).toBeGreaterThan(0)
+  })
+
+  it('verschweigt die Bewegung, solange die Reihe zu kurz ist', () => {
+    const series = momentumSeriesFor([mkLog(TODAY, true)], null, TODAY)
+    expect(momentumChange(series, 7)).toBe(null)
+  })
+
+  it('übersetzt Momentum zurück in eine Quote', () => {
+    // Gegenprobe zur Gleichgewichtsrechnung aus config.ts: 83 ⇄ 80 %
+    expect(momentumAsRate(83)).toBe(80)
+    expect(momentumAsRate(MOMENTUM.offTarget[2])).toBe(0)
+  })
+
+  it('liegt für eine simulierte 80-%-Quote in der richtigen Größenordnung', () => {
+    // Nicht auf den Punkt: Wo die Ausrutscher im Zeitraum liegen, verschiebt
+    // den Endwert — die Aussage „ungefähr 80 %" muss trotzdem stimmen.
+    const bei80 = currentMomentum(mkQuote(150, 0.8), TODAY)
+    expect(momentumAsRate(bei80)).toBeGreaterThanOrEqual(75)
+    expect(momentumAsRate(bei80)).toBeLessThanOrEqual(88)
+  })
+
+  it('bleibt in 0–100', () => {
+    expect(momentumAsRate(0)).toBe(0)
+    expect(momentumAsRate(100)).toBe(100)
+  })
+})
+
+describe('monthReview', () => {
+  const JULI = '2026-07'
+  // Juni voll: 20 on track, 10 daneben. Juli bis zum 6.: 6 on track.
+  const juni = Array.from({ length: 30 }, (_, i) => mkLog(shiftKey('2026-06-01', i), i < 20))
+  const juli = Array.from({ length: 6 }, (_, i) => mkLog(shiftKey('2026-07-01', i), true))
+
+  it('zählt nur Tage des Monats', () => {
+    const r = monthReview([...juni, ...juli], JULI, null, TODAY)
+    expect(r.onTrack).toBe(6)
+    expect(r.slips).toBe(0)
+    expect(r.pct).toBe(100)
+  })
+
+  it('markiert den laufenden Monat als Zwischenstand', () => {
+    expect(monthReview([...juni, ...juli], JULI, null, TODAY).laufend).toBe(true)
+    expect(monthReview([...juni, ...juli], '2026-06', null, TODAY).laufend).toBe(false)
+  })
+
+  it('vergleicht mit dem Vormonat', () => {
+    const r = monthReview([...juni, ...juli], JULI, null, TODAY)
+    expect(r.prevPct).toBe(67) // 20 von 30
+  })
+
+  it('hat keinen Vergleich, wenn der Vormonat leer ist', () => {
+    expect(monthReview(juli, JULI, null, TODAY).prevPct).toBe(null)
+  })
+
+  it('zählt eine perfekte Woche in dem Monat, in dem sie voll wird', () => {
+    // 27.06. bis 03.07. durchgehend on track — voll am 3. Juli
+    const logs = Array.from({ length: 7 }, (_, i) => mkLog(shiftKey('2026-06-27', i), true))
+    expect(monthReview(logs, '2026-07', null, TODAY).perfectWeeks).toBe(1)
+    expect(monthReview(logs, '2026-06', null, TODAY).perfectWeeks).toBe(0)
+  })
+
+  it('führt eine Serie über den Monatswechsel hinweg weiter', () => {
+    const logs = Array.from({ length: 10 }, (_, i) => mkLog(shiftKey('2026-06-29', i), true))
+    // 29.06.–06.07. = 8 Tage bis heute, alle on track
+    expect(monthReview(logs, '2026-07', null, TODAY).bestStreak).toBe(8)
+  })
+
+  it('nennt den häufigsten Trigger des Monats', () => {
+    const logs = [
+      mkLog('2026-07-01', false, ['Müde']),
+      mkLog('2026-07-02', false, ['Müde']),
+      mkLog('2026-07-03', false, ['Gestresst']),
+      mkLog('2026-06-15', false, ['Gestresst', 'Gestresst']),
+    ]
+    expect(monthReview(logs, JULI, null, TODAY).topTag).toEqual({ label: 'Müde', count: 2 })
+  })
+
+  it('lässt Pausentage aus der Quote heraus', () => {
+    const logs = [
+      mkLog('2026-07-01', true),
+      mkLog('2026-07-02', true),
+      mkPause('2026-07-03'),
+      mkPause('2026-07-04'),
+    ]
+    const r = monthReview(logs, JULI, null, TODAY)
+    expect(r.pct).toBe(100)
+    expect(r.paused).toBe(2)
+    expect(r.gezaehlt).toBe(2)
+  })
+
+  it('bleibt bei einem Monat ohne Einträge leer statt bei 0 %', () => {
+    expect(monthReview(juni, '2026-05', null, TODAY).pct).toBe(null)
   })
 })

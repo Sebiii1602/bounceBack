@@ -10,6 +10,7 @@ import {
   setHabitLogMode,
   setHabitPromptDeck,
   setHabitAlias,
+  setHabitAudioNotes,
   setHabitTarget,
   sortHabits,
   sortTags,
@@ -158,6 +159,17 @@ function HabitOptions({ habits }: { habits: Habit[] }) {
         ))}
       </div>
       <p className="mt-2 text-xs text-faint">{copy.more.promptHint}</p>
+
+      <p className="mb-2 mt-4 text-xs text-faint">{copy.more.audioLabel}</p>
+      <div className="flex flex-wrap gap-2">
+        <Chip active={!habit.audio_notes} onClick={() => void setHabitAudioNotes(habit.id, false)}>
+          {copy.more.audioOff}
+        </Chip>
+        <Chip active={habit.audio_notes} onClick={() => void setHabitAudioNotes(habit.id, true)}>
+          {copy.more.audioOn}
+        </Chip>
+      </div>
+      <p className="mt-2 text-xs text-faint">{copy.more.audioHint}</p>
     </Card>
   )
 }

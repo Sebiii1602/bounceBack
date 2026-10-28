@@ -15,6 +15,8 @@ create table if not exists public.habits (
   private_alias text,
   -- Reihenfolge in den Listen
   sort_order integer not null default 0,
+  -- Tonaufnahmen erlaubt (die Aufnahmen selbst liegen nur lokal im Browser)
+  audio_notes boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

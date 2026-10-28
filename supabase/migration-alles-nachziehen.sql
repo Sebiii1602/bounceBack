@@ -31,6 +31,9 @@ alter table public.habits add column if not exists prompt_deck text;
 alter table public.habits add column if not exists private_alias text;
 alter table public.habits add column if not exists sort_order integer not null default 0;
 
+-- 29.10.2026 — Tonaufnahmen pro Habit (die Aufnahmen selbst bleiben lokal)
+alter table public.habits add column if not exists audio_notes boolean not null default false;
+
 -- 14.07.2026 — Tags konvergieren über (user_id, label) statt über feste IDs.
 -- Vorher prüfen, ob es Dubletten gibt (muss 0 Zeilen liefern):
 --   select user_id, label, count(*) from public.tags

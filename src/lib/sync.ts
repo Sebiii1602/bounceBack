@@ -138,6 +138,7 @@ function normalize(table: SyncTable, raw: RemoteRow): Habit | Tag | LogEntry {
         prompt_deck: (raw.prompt_deck as Habit['prompt_deck'] | null) ?? null,
         private_alias: (raw.private_alias as string | null) ?? null,
         sort_order: (raw.sort_order as number | null) ?? 0,
+        audio_notes: (raw.audio_notes as boolean | null) ?? false,
       }
     : { ...base, label: raw.label as string }
 }
@@ -255,10 +256,12 @@ export async function deleteHabitEverywhere(habitId: string): Promise<void> {
       if (error) throw error
     }
   }
-  await db.transaction('rw', db.habits, db.logs, db.outbox, async () => {
+  await db.transaction('rw', db.habits, db.logs, db.outbox, db.recordings, async () => {
     const logIds = (await db.logs.where('habit_id').equals(habitId).primaryKeys()) as string[]
     await db.logs.bulkDelete(logIds)
     await db.habits.delete(habitId)
+    // Aufnahmen gibt es nur lokal — ohne ihren Habit wären sie unerreichbar
+    await db.recordings.where('habit_id').equals(habitId).delete()
     const gone = new Set<string>([habitId, ...logIds])
     const stale = (await db.outbox.toArray()).filter((o) => gone.has(o.row_id))
     await db.outbox.bulkDelete(stale.map((o) => o.seq))

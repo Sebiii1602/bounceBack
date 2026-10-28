@@ -23,6 +23,13 @@ export interface Habit {
   private_alias: string | null
   /** Reihenfolge in allen Listen; kleiner zuerst. */
   sort_order: number
+  /**
+   * Tonaufnahmen erlaubt (z. B. Gitarre). Bewusst eine Zugabe und keine
+   * Pflicht: Abhaken geht immer ohne. Eine Aufnahme zur Bedingung zu machen
+   * würde das Eintragen von fünf Sekunden auf fünf Minuten verlängern — und
+   * an Tagen ohne Lust fällt dann beides aus.
+   */
+  audio_notes: boolean
   created_at: string
   updated_at: string
 }
@@ -88,4 +95,25 @@ export interface OutboxRow {
 export interface MetaRow {
   key: string
   value: string
+}
+
+/**
+ * Eine Tonaufnahme zu einem Tag. Liegt **nur lokal** in IndexedDB und geht
+ * nie in den Sync: Audio-Blobs durch die Outbox zu schieben würde den
+ * Speicher sprengen und jeden Konflikt unlösbar machen. Das Archiv ist
+ * dadurch an dieses Gerät gebunden — dafür kostet es nichts und braucht
+ * keinen Upload.
+ */
+export interface Recording {
+  id: string
+  habit_id: string
+  /** Lokales Kalenderdatum als 'yyyy-MM-dd' */
+  date: string
+  blob: Blob
+  /** MIME-Typ, den der Browser tatsächlich geliefert hat. */
+  mime: string
+  duration_ms: number
+  /** Eigener Titel, sonst null (dann wird die Uhrzeit angezeigt). */
+  label: string | null
+  created_at: string
 }

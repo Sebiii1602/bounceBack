@@ -1,5 +1,5 @@
 import { MOMENTUM } from './config'
-import { mondayOf, parseKey, shiftKey, todayKey } from './dates'
+import { monthBounds, mondayOf, parseKey, shiftKey, todayKey } from './dates'
 import type { LogEntry, Severity } from './types'
 
 export interface TrendPoint {
@@ -450,4 +450,330 @@ export function weekdayStats(logs: LogEntry[]): WeekdayStat[] {
     counts[idx] = (counts[idx] ?? 0) + 1
   }
   return counts.map((count, weekday) => ({ weekday, label: WEEKDAYS_DE[weekday]!, count }))
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Zeitraum-Vergleiche — die Zahl allein sagt wenig, die Richtung sagt alles
+// ──────────────────────────────────────────────────────────────────────────
+
+/**
+ * Quote über die `days` Tage bis `today`, passend zum Habit-Typ. Bei
+ * Ziel-Habits wird gegen das Soll gerechnet (2× pro Woche über 30 Tage
+ * ≈ 8,6 Termine), nicht gegen die Tage — sonst stünde jeder Ziel-Habit
+ * dauerhaft bei 30 %.
+ */
+export function periodPct(
+  logs: LogEntry[],
+  target: number | null,
+  days: number,
+  today = todayKey(),
+): number | null {
+  return target === null
+    ? currentRollingPct(logs, days, today)
+    : goalPeriodPct(logs, target, days, today)
+}
+
+/** Dasselbe für die `days` Tage davor — die Vergleichsgröße. */
+export function previousPeriodPct(
+  logs: LogEntry[],
+  target: number | null,
+  days: number,
+  today = todayKey(),
+): number | null {
+  return periodPct(logs, target, days, shiftKey(today, -days))
+}
+
+/**
+ * Zielerfüllung über einen längeren Zeitraum: erledigte Termine gegen das
+ * anteilige Soll. Pausentage kürzen das Soll, genau wie in der Wochenrechnung.
+ */
+export function goalPeriodPct(
+  logs: LogEntry[],
+  target: number,
+  days: number,
+  today = todayKey(),
+): number | null {
+  const map = logMap(logs)
+  if (map.size === 0) return null
+  let done = 0
+  let paused = 0
+  let gesehen = false
+  for (let i = 0; i < days; i++) {
+    const v = map.get(shiftKey(today, -i))
+    if (v === undefined) continue
+    gesehen = true
+    if (v.kind === 'paused') paused++
+    else if (v.kind === 'on') done++
+  }
+  if (!gesehen) return null
+  const soll = Math.max(1, (target * (days - paused)) / 7)
+  return Math.round(Math.min(1, done / soll) * 100)
+}
+
+/** Momentum-Verlauf passend zum Habit-Typ. */
+export function momentumSeriesFor(
+  logs: LogEntry[],
+  target: number | null,
+  today = todayKey(),
+): MomentumPoint[] {
+  return target === null ? momentumSeries(logs, today) : goalMomentumSeries(logs, target, today)
+}
+
+/**
+ * Wie weit sich das Momentum in den letzten `days` Tagen bewegt hat.
+ * null, solange die Reihe keinen so alten Vergleichspunkt hat — eine
+ * Veränderung „seit Beginn" als Wochenwert auszugeben wäre gelogen.
+ */
+export function momentumChange(series: MomentumPoint[], days = 7): number | null {
+  if (series.length === 0) return null
+  const last = series[series.length - 1]!
+  const ref = shiftKey(last.date, -days)
+  const vorher = series.find((p) => p.date >= ref)
+  if (vorher === undefined || vorher.date !== ref) return null
+  return last.value - vorher.value
+}
+
+/**
+ * Welche Quote dieses Momentum auf Dauer bedeutet — die Umkehrung der
+ * Gleichgewichtsrechnung aus `config.ts`. Momentum 83 heißt: So sieht es aus,
+ * wenn rund 80 % der Tage on track sind. Das macht die Zahl erst lesbar; für
+ * sich genommen ist „83" bloß eine Skala ohne Einheit.
+ */
+export function momentumAsRate(value: number): number {
+  const boden = MOMENTUM.offTarget[2]
+  return clamp(Math.round(((value - boden) / (MOMENTUM.onTarget - boden)) * 100), 0, 100)
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Monatsrückblick
+// ──────────────────────────────────────────────────────────────────────────
+
+export interface MonthReview {
+  /** 'yyyy-MM' */
+  month: string
+  /** Läuft der Monat noch? Dann ist alles ein Zwischenstand. */
+  laufend: boolean
+  /** Kalendertage des Monats, die schon vorbei sind. */
+  tage: number
+  /** Tage mit Eintrag, die in die Quote zählen (ohne Pausentage). */
+  gezaehlt: number
+  onTrack: number
+  slips: number
+  paused: number
+  special: number
+  pct: number | null
+  prevPct: number | null
+  /** Längste Serie on-track-Tage, die in diesem Monat endete. */
+  bestStreak: number
+  /** Perfekte Wochen, die in diesem Monat voll geworden sind. */
+  perfectWeeks: number
+  topTag: { label: string; count: number } | null
+  momentumStart: number | null
+  momentumEnd: number | null
+}
+
+/**
+ * Was dieser Monat war. Die App zeigt sonst nur das Jetzt — rollierende 30
+ * Tage, die letzten sieben. Ein abgeschlossener Monat ist der einzige
+ * Zeitraum, den man mit dem davor vergleichen kann, ohne dass sich die
+ * Fenster überlappen. Erst dadurch wird sichtbar, ob es besser wird.
+ *
+ * Der laufende Monat wird nur bis `today` gerechnet und als Zwischenstand
+ * markiert; sonst stünde er bis zum Monatsende künstlich schlecht da.
+ */
+export function monthReview(
+  logs: LogEntry[],
+  month: string,
+  target: number | null = null,
+  today = todayKey(),
+): MonthReview {
+  const { from, to } = monthBounds(month)
+  const bis = to > today ? today : to
+  const laufend = to > today
+  const map = logMap(logs)
+
+  let onTrack = 0
+  let slips = 0
+  let paused = 0
+  for (let d = from; d <= bis; d = shiftKey(d, 1)) {
+    const v = map.get(d)
+    if (v === undefined) continue
+    if (v.kind === 'paused') paused++
+    else if (v.kind === 'on') onTrack++
+    else slips++
+  }
+  const special = logs.filter(
+    (l) => isRated(l) && l.special && l.date >= from && l.date <= bis,
+  ).length
+
+  const tage = Math.round(
+    (parseKey(bis).getTime() - parseKey(from).getTime()) / 86_400_000,
+  ) + 1
+  const pct =
+    target === null
+      ? onTrack + slips === 0
+        ? null
+        : Math.round((onTrack / (onTrack + slips)) * 100)
+      : goalPeriodPct(logs, target, tage, bis)
+
+  const vorMonat = shiftMonthKey(month, -1)
+  const prev = monthReviewPct(logs, vorMonat, target, today)
+
+  // Stand am Tag vor dem Monat — gibt es ihn nicht, fing die Reihe erst in
+  // diesem Monat an und es gibt kein „vorher"
+  const momentum = momentumSeriesFor(logs, target, bis)
+  const vorFrom = shiftKey(from, -1)
+  const momentumStart = momentum.find((p) => p.date === vorFrom)?.value ?? null
+  const momentumEnd = momentum.length > 0 ? momentum[momentum.length - 1]!.value : null
+
+  return {
+    month,
+    laufend,
+    tage,
+    gezaehlt: onTrack + slips,
+    onTrack,
+    slips,
+    paused,
+    special,
+    pct,
+    prevPct: prev,
+    bestStreak: bestStreakIn(map, from, bis),
+    perfectWeeks:
+      target === null
+        ? perfectWeeksIn(map, from, bis)
+        : goalPerfectWeeksIn(map, target, from, bis),
+    topTag: topTagIn(logs, from, bis),
+    momentumStart,
+    momentumEnd,
+  }
+}
+
+/** Nur die Quote eines Monats — für den Vergleich mit dem Vormonat. */
+function monthReviewPct(
+  logs: LogEntry[],
+  month: string,
+  target: number | null,
+  today: string,
+): number | null {
+  const { from, to } = monthBounds(month)
+  if (from > today) return null
+  const bis = to > today ? today : to
+  const map = logMap(logs)
+  if (target !== null) {
+    const tage =
+      Math.round((parseKey(bis).getTime() - parseKey(from).getTime()) / 86_400_000) + 1
+    return goalPeriodPct(logs, target, tage, bis)
+  }
+  let on = 0
+  let ab = 0
+  for (let d = from; d <= bis; d = shiftKey(d, 1)) {
+    const v = map.get(d)
+    if (v === undefined || v.kind === 'paused') continue
+    if (v.kind === 'on') on++
+    else ab++
+  }
+  return on + ab === 0 ? null : Math.round((on / (on + ab)) * 100)
+}
+
+/** Längste On-track-Serie, die im Zeitraum endet. Pausentage überbrücken. */
+function bestStreakIn(map: Map<string, DayValue>, from: string, to: string): number {
+  let best = 0
+  let run = 0
+  // Vor dem Monatsanfang weiterzählen: eine Serie, die im Vormonat begann und
+  // hier weiterläuft, ist dieselbe Serie — abschneiden würde sie kleinrechnen.
+  let start = from
+  for (let i = 0; i < 400; i++) {
+    const vor = shiftKey(start, -1)
+    const v = map.get(vor)
+    if (v === undefined || v.kind === 'off') break
+    start = vor
+  }
+  for (let d = start; d <= to; d = shiftKey(d, 1)) {
+    const v = map.get(d)
+    if (v === undefined || v.kind === 'off') {
+      run = 0
+      continue
+    }
+    if (v.kind === 'on') run++
+    if (d >= from) best = Math.max(best, run)
+  }
+  return best
+}
+
+/**
+ * Perfekte Wochen, die im Zeitraum voll geworden sind: Jedes siebte Mitglied
+ * einer durchgehenden Serie zählt an dem Tag, an dem es erreicht wird. So
+ * landet eine Woche, die am 27. September begann und am 3. Oktober voll wurde,
+ * im Oktober — dort, wo man sie verdient hat.
+ */
+function perfectWeeksIn(map: Map<string, DayValue>, from: string, to: string): number {
+  let start = from
+  for (let i = 0; i < 400; i++) {
+    const vor = shiftKey(start, -1)
+    const v = map.get(vor)
+    if (v === undefined || v.kind === 'off') break
+    start = vor
+  }
+  let run = 0
+  let count = 0
+  for (let d = start; d <= to; d = shiftKey(d, 1)) {
+    const v = map.get(d)
+    if (v === undefined || v.kind === 'off') {
+      run = 0
+      continue
+    }
+    if (v.kind !== 'on') continue
+    run++
+    if (run % 7 === 0 && d >= from) count++
+  }
+  return count
+}
+
+/** Ziel-Habits: Kalenderwochen im Zeitraum, in denen das Soll erreicht wurde. */
+function goalPerfectWeeksIn(
+  map: Map<string, DayValue>,
+  target: number,
+  from: string,
+  to: string,
+): number {
+  const wochen = new Set<string>()
+  for (let d = from; d <= to; d = shiftKey(d, 1)) wochen.add(mondayOf(d))
+  let count = 0
+  for (const monday of wochen) {
+    let done = 0
+    let paused = 0
+    for (let i = 0; i < 7; i++) {
+      const v = map.get(shiftKey(monday, i))
+      if (v === undefined) continue
+      if (v.kind === 'paused') paused++
+      else if (v.kind === 'on') done++
+    }
+    const soll = effectiveTarget(target, paused)
+    if (soll > 0 && done >= soll) count++
+  }
+  return count
+}
+
+/** Häufigster Trigger im Zeitraum. */
+function topTagIn(
+  logs: LogEntry[],
+  from: string,
+  to: string,
+): { label: string; count: number } | null {
+  const imZeitraum = relapseLogs(logs).filter((l) => l.date >= from && l.date <= to)
+  const counts = new Map<string, number>()
+  for (const l of imZeitraum) {
+    for (const tag of l.trigger_tags) counts.set(tag, (counts.get(tag) ?? 0) + 1)
+  }
+  const beste = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]
+  return beste === undefined ? null : { label: beste[0], count: beste[1] }
+}
+
+/** Lokale Monatsverschiebung ohne Umweg über `dates` — vermeidet Zyklen. */
+function shiftMonthKey(month: string, n: number): string {
+  const jahr = Number(month.slice(0, 4))
+  const monat = Number(month.slice(5, 7)) - 1 + n
+  const j = jahr + Math.floor(monat / 12)
+  const m = ((monat % 12) + 12) % 12
+  return `${j}-${String(m + 1).padStart(2, '0')}`
 }

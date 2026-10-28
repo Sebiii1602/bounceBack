@@ -11,6 +11,8 @@ import { CalendarGrid, type DayInfo } from '../components/CalendarGrid'
 import { DaySheet } from '../components/DaySheet'
 import { WeekProgress } from '../components/WeekProgress'
 import { JournalFeed } from '../components/JournalFeed'
+import { RecordingList } from '../components/RecordingList'
+import { mayShowDetails, useRevealed } from '../lib/privacy'
 import {
   currentStreak,
   goalPerfectWeeks,
@@ -18,6 +20,8 @@ import {
   perfectWeekCount,
   weekGoalProgress,
 } from '../lib/metrics'
+
+type View = 'kalender' | 'notizen' | 'aufnahmen'
 
 function LegendDot({ className, label }: { className: string; label: string }) {
   return (
@@ -44,8 +48,14 @@ export function History() {
   )
   const [month, setMonth] = useState(() => new Date())
   const [sheetDate, setSheetDate] = useState<string | null>(null)
-  const [view, setView] = useState<'kalender' | 'notizen'>('kalender')
+  const [view, setView] = useState<View>('kalender')
   const ziel = selected?.target_per_week ?? null
+  const revealed = useRevealed()
+  // Aufnahmen nur dort anbieten, wo es welche geben kann
+  const views: readonly View[] =
+    selected?.audio_notes === true ? ['kalender', 'notizen', 'aufnahmen'] : ['kalender', 'notizen']
+  // Habit gewechselt, während „Aufnahmen" offen war? Dann zurück zum Kalender.
+  const aktiv: View = views.includes(view) ? view : 'kalender'
 
   const dayInfo = useMemo(() => {
     const m = new Map<string, DayInfo>()
@@ -74,21 +84,36 @@ export function History() {
       <PageTitle title={copy.tabs.history} />
       <HabitSwitcher habits={habits} value={selected?.id} onChange={setHabitId} />
       <div className="mb-3 flex gap-2">
-        {(['kalender', 'notizen'] as const).map((key) => (
+        {views.map((key) => (
           <button
             key={key}
             type="button"
             onClick={() => setView(key)}
             className={`flex-1 rounded-full border px-3 py-1.5 text-sm transition ${
-              view === key ? 'border-ink bg-ink text-card' : 'border-line bg-card text-soft'
+              aktiv === key ? 'border-ink bg-ink text-card' : 'border-line bg-card text-soft'
             }`}
           >
-            {key === 'kalender' ? copy.history.viewCalendar : copy.history.viewJournal}
+            {key === 'kalender'
+              ? copy.history.viewCalendar
+              : key === 'notizen'
+                ? copy.history.viewJournal
+                : copy.audio.section}
           </button>
         ))}
       </div>
-      {view === 'notizen' ? (
+      {aktiv === 'notizen' ? (
         <JournalFeed logs={logs ?? []} habit={selected} />
+      ) : aktiv === 'aufnahmen' && selected ? (
+        <Card>
+          {mayShowDetails(selected, revealed) ? (
+            <>
+              <RecordingList habitId={selected.id} stats />
+              <p className="mt-3 text-xs text-faint">{copy.audio.localOnly}</p>
+            </>
+          ) : (
+            <p className="text-sm text-soft">{copy.today.hiddenDetails}</p>
+          )}
+        </Card>
       ) : (
         <>
       <Card>

@@ -23,6 +23,8 @@ import { JournalPanel } from './JournalPanel'
 import { WeekProgress } from './WeekProgress'
 import { DailyPrompt, promptWasRead } from './DailyPrompt'
 import { displayName, mayShowDetails, useRevealed } from '../lib/privacy'
+import { AudioRecorder } from './AudioRecorder'
+import { RecordingList } from './RecordingList'
 
 const MedKitIcon = (
   <>
@@ -272,6 +274,22 @@ export function HabitLogCard({ habit }: { habit: Habit }) {
           </>
         )}
       </div>
+      {/* Aufnahmen stehen bewusst unter dem Abhaken, nicht davor: Der Eintrag
+          ist in fünf Sekunden erledigt, das Aufnehmen ist die Zugabe danach. */}
+      {habit.audio_notes && zeigeDetails && (
+        <div className="mt-4 border-t border-line pt-3">
+          <div className="mb-2 flex items-baseline justify-between gap-2">
+            <span className="text-xs font-medium uppercase tracking-wider text-faint">
+              {copy.audio.section}
+            </span>
+            <span className="text-[11px] text-faint">{copy.audio.optional}</span>
+          </div>
+          <AudioRecorder habitId={habit.id} date={day} />
+          <div className="mt-2">
+            <RecordingList habitId={habit.id} date={day} />
+          </div>
+        </div>
+      )}
       <WeekProgress
         days={week}
         headline={headline}

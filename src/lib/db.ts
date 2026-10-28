@@ -7,6 +7,7 @@ import type {
   MetaRow,
   OutboxRow,
   PromptDeck,
+  Recording,
   Severity,
   SyncTable,
   Tag,
@@ -18,6 +19,8 @@ class BounceBackDB extends Dexie {
   tags!: EntityTable<Tag, 'id'>
   outbox!: EntityTable<OutboxRow, 'seq'>
   meta!: EntityTable<MetaRow, 'key'>
+  /** Nur lokal — siehe `Recording`. Taucht in keinem Sync-Pfad auf. */
+  recordings!: EntityTable<Recording, 'id'>
 }
 
 export const db = new BounceBackDB('bounceback')
@@ -209,6 +212,25 @@ db.version(6)
     }
   })
 
+// v7: habits.audio_notes + lokale Tonaufnahmen
+db.version(7)
+  .stores({
+    habits: 'id, updated_at',
+    logs: 'id, [habit_id+date], habit_id, updated_at',
+    tags: 'id, label, updated_at',
+    outbox: '++seq, row_id',
+    meta: 'key',
+    recordings: 'id, [habit_id+date], habit_id, created_at',
+  })
+  .upgrade((tx) =>
+    tx
+      .table('habits')
+      .toCollection()
+      .modify((h) => {
+        if (h.audio_notes === undefined) h.audio_notes = false
+      }),
+  )
+
 db.on('populate', (tx) => {
   void tx.table('tags').bulkAdd(buildDefaultTagRows())
 })
@@ -218,14 +240,22 @@ db.on('populate', (tx) => {
  * neu, damit das Gerät für den nächsten Account/Login sauber dasteht.
  */
 export async function clearLocalData(): Promise<void> {
-  await db.transaction('rw', db.habits, db.logs, db.tags, db.outbox, db.meta, async () => {
-    await db.habits.clear()
-    await db.logs.clear()
-    await db.tags.clear()
-    await db.outbox.clear()
-    await db.meta.clear()
-    await seedDefaultTags()
-  })
+  // Array-Form: ab sechs Tabellen greift Dexies Einzelargument-Signatur nicht mehr
+  await db.transaction(
+    'rw',
+    [db.habits, db.logs, db.tags, db.outbox, db.meta, db.recordings],
+    async () => {
+      await db.habits.clear()
+      await db.logs.clear()
+      await db.tags.clear()
+      await db.outbox.clear()
+      await db.meta.clear()
+      // Aufnahmen hängen an Habits, die es gleich nicht mehr gibt — und sie
+      // liegen nur hier. Beim Abmelden müssen sie mit weg.
+      await db.recordings.clear()
+      await seedDefaultTags()
+    },
+  )
 }
 
 /**
@@ -259,6 +289,7 @@ export async function addHabit(
       prompt_deck: promptDeck,
       private_alias: null,
       sort_order: await db.habits.count(),
+      audio_notes: false,
       created_at: t,
       updated_at: t,
     })
@@ -278,6 +309,14 @@ export async function setHabitLogMode(id: string, logSameDay: boolean): Promise<
 export async function setHabitTarget(id: string, targetPerWeek: number | null): Promise<void> {
   await db.transaction('rw', db.habits, db.outbox, async () => {
     await db.habits.update(id, { target_per_week: targetPerWeek, updated_at: nowIso() })
+    await enqueue('habits', 'upsert', id)
+  })
+}
+
+/** Tonaufnahmen für diesen Habit an- oder abschalten. */
+export async function setHabitAudioNotes(id: string, an: boolean): Promise<void> {
+  await db.transaction('rw', db.habits, db.outbox, async () => {
+    await db.habits.update(id, { audio_notes: an, updated_at: nowIso() })
     await enqueue('habits', 'upsert', id)
   })
 }
@@ -599,4 +638,37 @@ export async function deleteTag(id: string): Promise<void> {
     await db.tags.delete(id)
     await enqueue('tags', 'delete', id)
   })
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Tonaufnahmen — rein lokal, kein Sync (siehe `Recording` in types.ts)
+// ──────────────────────────────────────────────────────────────────────────
+
+export async function addRecording(
+  habitId: string,
+  date: string,
+  blob: Blob,
+  durationMs: number,
+): Promise<string> {
+  const id = crypto.randomUUID()
+  await db.recordings.add({
+    id,
+    habit_id: habitId,
+    date,
+    blob,
+    mime: blob.type,
+    duration_ms: durationMs,
+    label: null,
+    created_at: nowIso(),
+  })
+  return id
+}
+
+export async function deleteRecording(id: string): Promise<void> {
+  await db.recordings.delete(id)
+}
+
+export async function renameRecording(id: string, label: string): Promise<void> {
+  const sauber = label.trim()
+  await db.recordings.update(id, { label: sauber === '' ? null : sauber })
 }

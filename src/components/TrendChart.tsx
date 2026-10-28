@@ -2,6 +2,7 @@ import {
   CartesianGrid,
   Line,
   LineChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -10,7 +11,17 @@ import {
 import { fmtDayShort, fmtTick } from '../lib/dates'
 import type { TrendPoint } from '../lib/metrics'
 
-export function TrendChart({ data }: { data: TrendPoint[] }) {
+export function TrendChart({
+  data,
+  tooltipLabel = 'on track',
+  reference = null,
+}: {
+  data: TrendPoint[]
+  tooltipLabel?: string
+  /** Niveau des Vergleichszeitraums als gestrichelte Linie — macht „besser
+   *  oder schlechter als davor" direkt in der Kurve sichtbar. */
+  reference?: number | null
+}) {
   // In den ersten Tagen ist die Linie kaum sichtbar — Punkte helfen, bis genug Daten da sind
   const loggedPoints = data.filter((p) => p.pct !== null).length
   const dot = loggedPoints <= 10 ? { r: 3, strokeWidth: 0, fill: 'var(--color-track)' } : false
@@ -36,7 +47,7 @@ export function TrendChart({ data }: { data: TrendPoint[] }) {
           width={30}
         />
         <Tooltip
-          formatter={(value) => [`${String(value)} %`, 'on track']}
+          formatter={(value) => [`${String(value)} %`, tooltipLabel]}
           labelFormatter={(label) => fmtDayShort(String(label))}
           contentStyle={{
             borderRadius: 12,
@@ -47,6 +58,14 @@ export function TrendChart({ data }: { data: TrendPoint[] }) {
             boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
           }}
         />
+        {reference !== null && (
+          <ReferenceLine
+            y={reference}
+            stroke="var(--color-faint)"
+            strokeDasharray="4 4"
+            strokeOpacity={0.7}
+          />
+        )}
         <Line
           type="monotone"
           dataKey="pct"

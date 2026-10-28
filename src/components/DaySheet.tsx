@@ -7,6 +7,7 @@ import type { Habit } from '../lib/types'
 import { LogButtons } from './LogButtons'
 import { LogDetails } from './LogDetails'
 import { JournalPanel } from './JournalPanel'
+import { RecordingList } from './RecordingList'
 
 /** Bottom-Sheet zum Nachtragen/Ändern eines beliebigen Tags im Kalender. */
 export function DaySheet({
@@ -117,6 +118,14 @@ export function DaySheet({
               </p>
               <JournalPanel habit={habit} date={date} />
             </>
+          )}
+          {habit.audio_notes && (
+            <div className="mt-4 border-t border-line pt-3">
+              <div className="mb-2 text-xs font-medium uppercase tracking-wider text-faint">
+                {copy.audio.section}
+              </div>
+              <RecordingList habitId={habit.id} date={date} />
+            </div>
           )}
           {log && (
             <button
