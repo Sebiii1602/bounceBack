@@ -57,6 +57,10 @@ export function History() {
   // Habit gewechselt, während „Aufnahmen" offen war? Dann zurück zum Kalender.
   const aktiv: View = views.includes(view) ? view : 'kalender'
 
+  // Pausierte Tage senken das Wochenziel. Wer vorher noch trainiert hat, steht
+  // dann über dem Soll — „2 von 1“ wäre dafür die falsche Anzeige.
+  const wochenstand = ziel === null ? null : weekGoalProgress(logs ?? [], ziel)
+
   const dayInfo = useMemo(() => {
     const m = new Map<string, DayInfo>()
     for (const l of logs ?? []) {
@@ -160,12 +164,11 @@ export function History() {
         <WeekProgress
           days={lastSevenDays(logs ?? [])}
           headline={
-            ziel === null
+            wochenstand === null
               ? copy.today.streak(currentStreak(logs ?? []))
-              : copy.today.goalProgress(
-                  weekGoalProgress(logs ?? [], ziel).done,
-                  weekGoalProgress(logs ?? [], ziel).target,
-                )
+              : wochenstand.done >= wochenstand.target
+                ? copy.today.goalReached(wochenstand.target)
+                : copy.today.goalProgress(wochenstand.done, wochenstand.target)
           }
           perfectWeeks={
             ziel === null ? perfectWeekCount(logs ?? []) : goalPerfectWeeks(logs ?? [], ziel)

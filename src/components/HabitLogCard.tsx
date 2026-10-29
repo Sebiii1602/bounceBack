@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, endPause, pauseRange, setLogState } from '../lib/db'
 import { copy } from '../lib/copy'
-import { fmtDayLong, fmtDayShort, shiftKey, todayKey, yesterdayKey } from '../lib/dates'
+import { fmtDayLong, fmtDayShort, todayKey, yesterdayKey } from '../lib/dates'
 import {
   currentGoalMomentum,
   currentGoalPct,
@@ -24,6 +24,7 @@ import { WeekProgress } from './WeekProgress'
 import { DailyPrompt, promptWasRead } from './DailyPrompt'
 import { displayName, mayShowDetails, useRevealed } from '../lib/privacy'
 import { AudioRecorder } from './AudioRecorder'
+import { PausePicker } from './PausePicker'
 import { RecordingList } from './RecordingList'
 
 const MedKitIcon = (
@@ -33,49 +34,6 @@ const MedKitIcon = (
     <path d="M12 11.5v4M10 13.5h4" />
   </>
 )
-
-/**
- * Wie lange pausiert? Sechs Wochen Verletzung soll man einmal eintragen —
- * nicht jeden Morgen erneut. „Bis Datum" nutzt den nativen Datumsdialog.
- */
-function PausePicker({ onPick }: { onPick: (bis: string) => void }) {
-  const today = todayKey()
-  return (
-    <div className="mt-2 rounded-xl bg-paper p-3">
-      <p className="mb-2 text-xs text-faint">{copy.today.pauseFor}</p>
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => onPick(today)}
-          className="rounded-full border border-line bg-card px-3 py-1.5 text-sm text-soft"
-        >
-          {copy.today.pauseToday}
-        </button>
-        {[1, 2, 4, 6].map((wochen) => (
-          <button
-            key={wochen}
-            type="button"
-            onClick={() => onPick(shiftKey(today, wochen * 7 - 1))}
-            className="rounded-full border border-line bg-card px-3 py-1.5 text-sm text-soft"
-          >
-            {copy.today.pauseWeeks(wochen)}
-          </button>
-        ))}
-      </div>
-      <label className="mt-3 flex items-center gap-2 text-xs text-faint">
-        {copy.today.pauseUntilDate}
-        <input
-          type="date"
-          min={today}
-          onChange={(e) => {
-            if (e.target.value) onPick(e.target.value)
-          }}
-          className="rounded-lg border border-line bg-card px-2 py-1.5 text-sm text-ink outline-none"
-        />
-      </label>
-    </div>
-  )
-}
 
 export function HabitLogCard({ habit }: { habit: Habit }) {
   const target = habit.target_per_week
@@ -257,8 +215,8 @@ export function HabitLogCard({ habit }: { habit: Habit }) {
                     </button>
                     {pausePanel && (
                       <PausePicker
-                        onPick={(bis) => {
-                          void pauseRange(habit.id, today, bis)
+                        onPick={(von, bis) => {
+                          void pauseRange(habit.id, von, bis)
                           setPausePanel(false)
                         }}
                       />

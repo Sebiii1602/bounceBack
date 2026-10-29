@@ -1,12 +1,13 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, deleteLog, setLogSpecial, setLogState, toggleLogPaused } from '../lib/db'
+import { db, deleteLog, pauseRange, setLogSpecial, setLogState, toggleLogPaused } from '../lib/db'
 import { copy } from '../lib/copy'
 import { fmtDayLong, todayKey } from '../lib/dates'
 import type { Habit } from '../lib/types'
 import { LogButtons } from './LogButtons'
 import { LogDetails } from './LogDetails'
 import { JournalPanel } from './JournalPanel'
+import { PausePicker } from './PausePicker'
 import { RecordingList } from './RecordingList'
 
 /** Bottom-Sheet zum Nachtragen/Ändern eines beliebigen Tags im Kalender. */
@@ -27,6 +28,7 @@ export function DaySheet({
   const rateable = date < todayKey() || habit.log_same_day || habit.target_per_week !== null
   // Pausieren ergibt nur bei Habits Sinn, die man aktiv tut
   const kannPausieren = habit.log_same_day || habit.target_per_week !== null
+  const [pausePanel, setPausePanel] = useState(false)
 
   // Hintergrund festhalten, solange das Sheet offen ist: sonst scrollt auf dem
   // iPhone die Seite dahinter mit und man erwischt den Inhalt kaum.
@@ -108,6 +110,30 @@ export function DaySheet({
                   </svg>
                   {copy.today.paused}
                 </button>
+              )}
+              {/* Eine Verletzung dauert selten einen Tag. Wer im Kalender
+                  zurückblättert, will meist eine ganze Strecke nachtragen —
+                  hier liegt der Einstieg dafür, mit diesem Tag als Beginn. */}
+              {kannPausieren && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setPausePanel((v) => !v)}
+                    className="mt-2 w-full text-center text-sm font-medium text-rest-deep underline underline-offset-2"
+                  >
+                    {copy.today.pauseRangeOpen}
+                  </button>
+                  {pausePanel && (
+                    <PausePicker
+                      from={date}
+                      onPick={(von, bis) => {
+                        void pauseRange(habit.id, von, bis)
+                        setPausePanel(false)
+                        onClose()
+                      }}
+                    />
+                  )}
+                </>
               )}
               {log?.rated && !log.paused && <LogDetails log={log} onDone={onClose} />}
             </>
